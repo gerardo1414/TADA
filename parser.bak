@@ -1,6 +1,6 @@
 #lang brag
 
-command : verb-phrase 
+command : verb-phrase
         | verb-phrase noun-phrase
         | verb-phrase noun-phrase prep noun-phrase
 
