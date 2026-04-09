@@ -1,0 +1,1 @@
+("9.0" tarm64osx ("d022621afe6267be024789935eb52dcd91a03655" . "153fbd59f9c8aa1d57da8002310986a4494cc740") #"/Users/saulbolanos/TADA/runtime.rkt" (collects #"br" #"quicklang.rkt") (collects #"drracket" #"private" #"drracket-errortrace-key.rkt") (collects #"racket" #"runtime-config.rkt"))
