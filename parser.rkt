@@ -1,13 +1,13 @@
 #lang brag
 program      : section*
-@section     : section_name LBRACE entry* RBRACE
-@section_name: "create_room"
-entry        : LBRACE field+ RBRACE
-@field       : KEY scalar-val
-             | KEY list-val
-             | KEY nested-block
-             | KEY
-@scalar-val  : VALUE
-@list-val    : LBRACKET list-items RBRACKET
-@list-items  : VALUE (COMMA VALUE)*
-nested-block : LBRACE field+ RBRACE
+@section     : room | character
+
+room         : ROOM LBRACE room-property-pair* RBRACE
+room-property-pair: LBRACE (room-property COLON value)* RBRACE
+room-property: NAME | LINKS
+
+character    : "N/A"
+
+value        : STRING | list
+@list        : LBRACKET list-items RBRACKET
+@list-items  : [VALUE] (COMMA VALUE)*

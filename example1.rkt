@@ -1,10 +1,5 @@
-#lang reader "tokenize-only.rkt"
+#lang reader "parse-only.rkt"
  create_room {
-     name: "cave"
+     name:"cave"
      links: ["tunnel"]
-   }
-
-create_room {
-     name: "tunnel"
-     links: ["cave"]
    }

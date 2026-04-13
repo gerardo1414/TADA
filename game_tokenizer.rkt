@@ -25,9 +25,7 @@
    ["name" (token 'NAME lexeme)]
 
    ; room properties
-   ["links" (token 'LINKS lexeme)]
-
-   [(eof) (token 'EOF "eof")]))
+   ["links" (token 'LINKS lexeme)]))
 
 (define (make-tokenizer ip [path #f])
   (port-count-lines! ip)
