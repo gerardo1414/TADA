@@ -1,7 +1,7 @@
 #lang racket
 (require rackunit
-         "game_parser.rkt"
-         "game_tokenizer.rkt"
+         "parser.rkt"
+         "tokenizer.rkt"
          brag/support)
 
 (define (parse-input str)

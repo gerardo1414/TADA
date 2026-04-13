@@ -1,6 +1,7 @@
 #lang brag
 program      : section*
-@section     : SECTION LBRACE entry* RBRACE
+@section     : section_name LBRACE entry* RBRACE
+@section_name: "create_room"
 entry        : LBRACE field+ RBRACE
 @field       : KEY scalar-val
              | KEY list-val

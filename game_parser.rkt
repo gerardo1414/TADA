@@ -1,5 +1,5 @@
 #lang racket
- 
+ ;;for every node there needs a macro 
 (require brag/support
          (prefix-in grammar: "grammar.rkt"))
  
@@ -80,4 +80,3 @@
         (list key sub)]
  
        [else (list key "?")])]))
- 
