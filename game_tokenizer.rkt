@@ -11,8 +11,10 @@
    ["}"  (token 'RBRACE "}")]
    [":"  (token 'COLON ":")]
 
-   [(from/to #\" #\")
-    (token 'STRING lexeme)]
+ 
+ [(:: #\" (:* (:~ #\")) #\")
+ (token 'STRING
+        (substring lexeme 1 (- (string-length lexeme) 1)))]
    
    ["["  (token 'LBRACKET "[")]
    ["]"  (token 'RBRACKET "]")]

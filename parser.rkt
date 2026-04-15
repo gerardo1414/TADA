@@ -11,13 +11,12 @@ characters    : NAME | list | dialogue | quests
 
 items          : list
 
-dialogue       : STRING | list
-
 quests         : list
 
 
-value        : STRING | list 
+value : STRING| list
+dialogue : STRING | list
 number       : INT | FLOAT
->>>>>>> cd769779b2a876b29aba209ddf161ad298f2d59f
 @list        : /LBRACKET list-items /RBRACKET
-@list-items  : [value] (COMMA value)*
+@list-items  : [value] (/COMMA value)*
+;;@string : /QUOTE /STRING-CONTENT /QUOTE
