@@ -1,5 +1,16 @@
 #lang brag
 program      : section*
+<<<<<<< HEAD
+@section     : room | character
+
+room         : ROOM /LBRACE room-property-pair* /RBRACE
+room-property-pair: room-property /COLON value
+room-property: NAME | LINKS
+
+character    : "N/A"
+
+value        : STRING | list
+=======
 @section     : room | characters
 
 room         : ROOM /LBRACE room-property-pair* /RBRACE
