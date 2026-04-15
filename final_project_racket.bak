@@ -113,9 +113,6 @@
 
 
 
-;inspect and detect NPC
-; IMPLEMENT WHEN NPC ARE IMPLEMENETED
-
 
 ;               COORDINATE SYSTEM
 
@@ -176,72 +173,6 @@
 
 
 ;               ROOMS
-; room constructor 
-(define (make-room name connections characters items x1 y1 x2 y2) ; x and y are the room barriers. connections, characters, and items are lists
-
-  (list name connections characters items x1 y1 x2 y2))
-
-; accessors 
-(define (room-name room) (list-ref room 0))
-
-(define (room-connections room) (list-ref room 1))
-
-(define (room-characters room) (list-ref room 2))
-
-(define (room-items room) (list-ref room 3))
-
-(define (room-x1 room) (list-ref room 4))
-
-(define (room-y1 room) (list-ref room 5))
-
-(define (room-x2 room) (list-ref room 6))
-
-(define (room-y2 room) (list-ref room 7))
-
-
-
-;               QUESTS
-
-; quest constructor
-; completed? is a flag that is initialized as false
-(define (make-quest description target-room reward-items)
-  
-  (list description target-room reward-items #f))
-
-(define (quest-desc quest) (list-ref quest 0))
-
-(define (quest-target quest) (list-ref quest 1))
-
-(define (quest-rewards quest) (list-ref quest 2))
-
-(define (quest-completed? quest) (list-ref quest 3))
-
-; mark a quest as complete, we rebuild the quest but this time we set the flag as true
-(define (quest-complete! quest)
-  
-  (list (quest-desc quest) (quest-target quest) (quest-rewards quest) #t))
-
-
-
-;               NPC
-;npc constructor
-; dialouge is a list of responses a player can say, quests is a list of quests, and items is a list of items that are used as quest rewards
-(define (make-npc name dialogue quests items)
-  
-  (list name dialogue quests items))
-
-; accessors
-(define (npc-name npc) (list-ref npc 0))
-(define (npc-dialogue npc) (list-ref npc 1))
-(define (npc-quests npc) (list-ref npc 2))
-(define (npc-items npc) (list-ref npc 3))
-
-; function to talk to npc
-(define (talk-to npc)
-  
-  (displayln (format "~a says: 'Hello traveler, what do you want?'" (npc-name npc))))
-  
-;  (let loop ((options ))
 
 
 
