@@ -50,14 +50,33 @@
 (define (inventory-show)
   
   (cond
-    ((null? inventory) (displayln "You have nothing in your inventory!"))
-
+    ((null? inventory)
+     (displayln "You have nothing in your inventory!")
+     (displayln (format "Gold: ~a" player-gold)))
+    
     (else
      (displayln "Your inventory:")
-     ; for loop over inventory
+     
      (for ([item inventory])
-       ; format allows us ti input data in the middle of a string using ~a
-       (displayln (format "  ~a" (item-name item)))))))
+       (displayln (format "  ~a" (item-name item))))
+     (displayln (format "Gold: ~a" player-gold)))))
+
+;     Gold/money
+
+; set player gold
+(define player-gold 0)
+
+; add to player gold using mutability
+(define (gold-add! amount)
+  
+  (set! player-gold (+ player-gold amount))
+  (displayln (format "You now have ~a gold." player-gold)))
+
+; spend gold
+(define (gold-spend! amount)
+  
+  (set! player-gold (- player-gold amount)))
+
 
 
 ;               ACTIONS
@@ -102,9 +121,9 @@
       ; item found, check to see f you can inspect it
       ((item-can? found 'inspect)
        (displayln (format "=== ~a ===" (item-name found)))
-       (displayln (format "Value: ~a" (item-value found))))
-       (displayln (item-desc found))
-      
+       (displayln (format "Value: ~a" (item-value found)))
+       (displayln (item-desc found)))   ; paren closes here instead
+
       (else
        (displayln (format "You can't inspect the: ~a." (item-name found)))))))
 
@@ -222,76 +241,361 @@
   (list (quest-desc quest) (quest-target quest) (quest-rewards quest) #t))
 
 
-
 ;               NPC
-;npc constructor
-; dialouge is a list of responses a player can say, quests is a list of quests, and items is a list of items that are used as quest rewards
+; npc constructor
+; dialogue is a hash of (player-line npc-response) pairs, quests is a list of quests, items is a list of reward items
 (define (make-npc name dialogue quests items)
   
   (list name dialogue quests items))
 
 ; accessors
-(define (npc-name npc) (list-ref npc 0))
+(define (npc-name npc)     (list-ref npc 0))
 (define (npc-dialogue npc) (list-ref npc 1))
-(define (npc-quests npc) (list-ref npc 2))
-(define (npc-items npc) (list-ref npc 3))
+(define (npc-quests npc)   (list-ref npc 2))
+(define (npc-items npc)    (list-ref npc 3))
 
-; function to talk to npc
+; all npcs
+(define npcs '())
+
+; add npc to npcs list using mutability
+(define (npc-register! npc)
+  
+  (set! npcs (append npcs (list npc))))
+
+; locate npc in list
+(define (npc-find name)
+  
+  (findf (lambda (n) (string-ci=? (npc-name n) name)) npcs))
+
+; dialogue helpers
+; helpers were my idea but claude assisted in fleshing them out
+
+; make-option makes potions in dialogue
+; player-line npc-responses next-options -> option
+; npc-responses is list of strings the npc says or it can be a lambda to react to game states
+; next-options is list of further response options or '() which ends conversation
+(define (make-option player-line npc-responses next-options)
+  
+  (list player-line npc-responses next-options))
+
+; make-dialogue-node, nodes are used to divide parts of the conversation, so the greeting, quest talk and goodbye would have their own node
+; npc-lines is a list of strings that the npc says
+; options is a list of make-option aka responses
+; use a hash to assign responses to options
+(define (make-dialogue-node npc-lines options)
+  
+  (list npc-lines
+        ; for loop with hash assigns the numbers to each option so the user does not have to
+        (for/hash ((opt options)
+                   (i (in-naturals 1)))
+          (values i opt))))
+
+; talk-to
 (define (talk-to npc)
+  (let loop ((node (npc-dialogue npc)))
+    (let ((npc-lines (car node))
+          (next-opts (cadr node)))
+      
+      ; loops through all npc lines and prints them before options appear
+      (for ((line npc-lines))
+        (displayln (format "~a: ~a" (npc-name npc) line)))
+
+      ; checks if there are any options left, if '() is read then the conversation is over
+      (cond
+        ((or (null? next-opts)
+             (and (hash? next-opts) (hash-empty? next-opts)))
+         (void))
+        (else
+         ; loops over the options/hash, prints with corresponding number
+         (for (((key val) (in-hash next-opts)))
+           (displayln (format "  ~a. ~a" key (car val))))
+
+         (let ((choice (read)))
+           (cond
+             ; hash-has-key checks if the inputted number exists in the hash
+             ((hash-has-key? next-opts choice)
+              (let ((chosen (hash-ref next-opts choice)))
+                (displayln (format "You: ~a" (car chosen)))
+                ; cadr chosen is npc-responses, remember it can be a list or a lambda
+                (let ((responses (cadr chosen)))
+                  (let ((actual-responses
+                         (if (procedure? responses)
+                             (responses)   ; call the lambda to get the real response
+                             responses)))
+                    ; loops through npc responses
+                    (for ((line actual-responses))
+                      (displayln (format "~a: ~a" (npc-name npc) line)))
+                    ; caddr is next batch of options, make into hash before loop
+                    (loop (list '()
+                                (for/hash ((opt (caddr chosen))
+                                           (i (in-naturals 1)))
+                                  (values i opt))))))))
+             (else
+              (displayln "That is not a valid choice.")
+              ; re-prompt instead of ending conversation on bad input
+              (loop node)))))))))
+
+; handle-talk
+; looks to see if the npc exists then it calls talk to
+(define (handle-talk args)
   
-  (displayln (format "~a says: 'Hello traveler, what do you want?'" (npc-name npc))))
+  (let ((found (npc-find args)))
+    
+    (cond
+      ((not found)
+       (displayln (format "You don't see '~a' here." args)))
+      (else
+       (talk-to found)))))
+
+
+; example by claude
+;(define old-man
+;  (make-npc "Old Man"
+;            (make-dialogue-node
+;              '("Hello traveler, how are you?")
+;              (list
+;                (make-option "Good!"
+;                             '("Glad to hear it! Can I help you?")
+;                             (list
+;                               (make-option "Any quests?"
+;                                            '("Go to the cellar for me.")
+;                                            '())
+;                               (make-option "Goodbye."
+;                                            '("Safe travels!")
+;                                            '())))
+;                (make-option "Not great..."
+;                             '("Sorry to hear that.")
+;                             '())
+;                (make-option "Goodbye."
+;                             '("Farewell!")
+;                             '())))
+;            '()
+;            '()))
+;
+;(npc-register! old-man)
+
+;         USER INPUT
+
+; move handler
+(define (handle-move args)
+  (cond
+    ((equal? args "forward")  (move-forward))
+    ((equal? args "backward") (move-backward))
+    ((equal? args "left")     (move-left))
+    ((equal? args "right")    (move-right))
+    (else (displayln (format "Unknown direction: '~a'" args)))))
+
+(define (handle-take args)
+  (displayln "Taking from room not yet implemented."))
+
+(define (help)
+  (displayln "Commands: move [forward/backward/left/right]")
+  (displayln "          talk [name]")
+  (displayln "          take [item]")
+  (displayln "          drop [item]")
+  (displayln "          inspect [item]")
+  (displayln "          inventory")
+  (displayln "          wander")
+  (displayln "          quit"))
+
+; checks what the user inputted then does the action accordingly
+(define (parse-input input)
+  ; claude helped me here
+  (let ((parts (string-split input)))
+    
+    (cond
+      ((null? parts) (displayln "Please enter a command."))
+      (else
+       (let ((command (car parts))
+             (args    (string-join (cdr parts) " ")))
+         (cond
+           ((equal? command "move")      (handle-move args))
+           ((equal? command "take")      (handle-take args))
+           ((equal? command "drop")      (drop args))
+           ((equal? command "inspect")   (inspect-inventory args))
+           ((equal? command "inventory") (inventory-show))
+           ((equal? command "wander")    (wander))
+           ((equal? command "talk")      (handle-talk args))
+           ((equal? command "help")     (help))
+           (else (displayln (format "Unknown command: '~a'" command)))))))))
+
+; input loop
+(define (game-loop)
   
-;  (let loop ((options ))
+  (display "> ")
+  ; input becomes read-line
+  (let ((input (read-line)))
+    (cond
+      ((equal? input "quit") (displayln "Goodbye!"))
+      
+      (else
+       (parse-input input)
+       (game-loop)))))
 
 
+; MAIN/TEST
+; courtesy of claude
+; TEST / MAIN
+
+; items
+(define beer
+  (make-item "Beer"
+             "A frothy mug of ale. Smells strong."
+             5
+             '(take drop inspect drink)))
+
+(define bread
+  (make-item "Bread"
+             "A stale loaf of bread sitting on the counter."
+             1
+             '(take drop inspect eat)))
+
+(define knife
+  (make-item "Kitchen Knife"
+             "A very sharp knife used for cooking. Probably shouldn't take this."
+             10
+             '(inspect)))
+
+(define mop
+  (make-item "Mop"
+             "A dirty mop leaning against the bathroom wall."
+             1
+             '(inspect)))
+
+(define trinket
+  (make-item "Peculiar Trinket"
+             "A strange little object. You're not sure where it came from, but it catches the light oddly."
+             0
+             '(take drop inspect)))
+
+; rooms
+(define bar
+  (make-room "The Bar"
+             '("bathroom" "kitchen")  ; connections
+             '()                      ; characters added after
+             (list beer bread)        ; items
+             0 0 10 10))              ; x1 y1 x2 y2
+
+(define bathroom
+  (make-room "Bathroom"
+             '("bar")
+             '()
+             (list mop)
+             11 0 15 10))
+
+(define kitchen
+  (make-room "Kitchen"
+             '("bar")
+             '()
+             (list knife)
+             0 11 10 15))
+
+(define bartender
+  (make-npc "Bartender"
+            (make-dialogue-node
+             '("Hey there. What can I get ya?")
+             (list
+              (make-option "I'll have a beer."
+                           '("Coming right up. That'll be 5 gold.")
+                           (list
+                            (make-option "Here you go."
+                                         (lambda ()
+                                           (if (>= player-gold 5)
+                                               (begin
+                                                 (gold-spend! 5)
+                                                 (inventory-add! beer)
+                                                 (displayln "You now have a beer.")
+                                                 '("Cheers! Enjoy your drink."))
+                                               '("Hey, you're a bit short. Come back when you've got the gold.")))
+                                         '())
+                            (make-option "Actually nevermind."
+                                         '("Suit yourself.")
+                                         '())))
+              (make-option "What's good here?"
+                           '("The ale is fresh. Kitchen's got bread too if you're hungry.")
+                           (list
+                            (make-option "I'll keep that in mind, thanks."
+                                         '("No worries. Holler if you need anything.")
+                                         '())))
+              (make-option "Where does that door go?"
+                           '("Bathroom's to the east. Kitchen's to the north. Don't go snooping around back there.")
+                           (list
+                            (make-option "Wasn't planning to."
+                                         '("Good. Drink up.")
+                                         '())
+                            (make-option "What if I do?"
+                                         '("Then we're gonna have a problem, friend.")
+                                         '())))
+              (make-option "I've got something you might want..."
+                           (lambda ()
+                             (if (inventory-find "Peculiar Trinket")
+                                 (begin
+                                   (inventory-remove! "Peculiar Trinket")
+                                   (inventory-add! beer)
+                                   '("Well I'll be... I've been looking for one of these for years. Here, take a beer on me."))
+                                 '("Hm? You've got nothing worth my time, friend.")))
+                           '())
+              (make-option "Goodbye."
+                           '("Take care now.")
+                           '())))
+            '()
+            '()))
+(npc-register! bartender)
 
 
+; friend npc
+(define friend
+  (make-npc "Friend"
+            (make-dialogue-node
+             '("Hey! Good to see you. Quite the place, huh?")
+             (list
+              (make-option "Yeah! Hey, can I borrow some gold?"
+                           (lambda ()
+                             (if (>= player-gold 5)
+                                 '("You already look like you're doing fine!")
+                                 (begin
+                                   (gold-add! 5)
+                                   '("Sure, I've got you covered. Here's 5 gold. Pay me back later!"))))
+                           '())
+              (make-option "What are you drinking?"
+                           '("Just some water, I'm trying to save money.")
+                           (list
+                            (make-option "Smart."
+                                         '("Unlike some people I know...")
+                                         '())
+                            (make-option "Boring!"
+                                         '("Hey, not all of us are here to party.")
+                                         '())))
+              (make-option "Goodbye."
+                           '("See you around!")
+                           '())))
+            '()
+            '()))
+
+(npc-register! friend)
 
 
-; TESTS courtesy of Claude
-;;; ----------------------------------------------------------
-;;;  Tests / Demo
-;;; ----------------------------------------------------------
+; main
+(define (main)
+  (displayln "===========================================")
+  (displayln "   Welcome to The Rusty Flagon            ")
+  (displayln "===========================================")
+  (displayln "You step into a dimly lit bar.")
+  (displayln "The smell of ale and sawdust fills the air.")
+  (displayln "A bartender wipes down the counter.")
+  (displayln "Your friend waves at you from a nearby stool.")
+  (displayln "Something glimmers by your foot.")
+  (displayln "")
+  (displayln "Commands: move [forward/backward/left/right]")
+  (displayln "          talk [name]")
+  (displayln "          take [item]")
+  (displayln "          drop [item]")
+  (displayln "          inspect [item]")
+  (displayln "          inventory")
+  (displayln "          wander")
+  (displayln "          quit")
+  (displayln "===========================================")
+  (displayln "")
+  (game-loop))
 
-(define sword   (make-item "Iron Sword"    "A worn iron sword. Still sharp." 50  '(take drop inspect)))
-(define potion  (make-item "Health Potion" "A small red vial. Smells sweet."  20  '(take drop inspect)))
-(define boulder (make-item "Giant Boulder" "Way too heavy to carry."           0   '(inspect)))
-(define relic   (make-item "Ancient Relic" "A strange glowing artifact."       500 '(inspect)))
-
-(displayln "=== INVENTORY TESTS ===")
-(inventory-show)                   ; empty inventory
-(take sword)                       ; take sword
-(take potion)                      ; take potion
-(take boulder)                     ; should fail, boulder has no 'take
-(inventory-show)                   ; should show sword and potion
-(newline)
-
-(displayln "=== INSPECT TESTS ===")
-(inspect-inventory "Iron Sword")   ; should show sword details
-(inspect-inventory "Giant Boulder"); should fail, not in inventory
-(inspect-inventory "Health Potion"); should show potion details
-(newline)
-
-(displayln "=== DROP TESTS ===")
-(drop "Iron Sword")                ; should drop sword
-(drop "Iron Sword")                ; should fail, no longer in inventory
-(drop "Ancient Relic")             ; should fail, never picked up
-(inventory-show)                   ; should only show potion
-(newline)
-
-(displayln "=== MOVEMENT TESTS ===")
-(curr-pos)                         ; starting position
-(move-forward)
-(move-forward)
-(move-right)
-(curr-pos)
-(move-backward)
-(move-left)
-(curr-pos)                         ; should be back to start
-(newline)
-
-(displayln "=== WANDER TESTS ===")
-(curr-pos)                         ; position before wandering
-(wander)
-(wander)
-(wander)
+(main)
