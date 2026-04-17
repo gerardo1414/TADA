@@ -13,7 +13,7 @@ create_room {
 create_room {
     name:       "windy hall"
     links:      ["cave", "dungeon"]
-    size:       ["4 4 5 5"]
+    size:       [4 4 5 5]
     characters: ["ghost"]
     dialogue:   ["ooooooo"]
     items:      ["lantern"]
