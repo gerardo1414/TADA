@@ -1,1 +1,9 @@
+<<<<<<< HEAD
 ("9.0" ta6nt ("8d44c0a6e6ad19f7ab6c13a9b2241403e6510c49" . "8177772a3dcb36c078c73ad7a81897229639f0e4") #"C:\\Users\\ouyel\\ProgrammingLang\\TADA\\game_tokenizer.rkt" #"C:\\Users\\ouyel\\ProgrammingLang\\TADA\\parser.rkt" (collects #"br" #"quicklang.rkt") (collects #"brag" #"support.rkt") (collects #"drracket" #"private" #"drracket-errortrace-key.rkt") (collects #"racket" #"runtime-config.rkt"))
+=======
+<<<<<<< HEAD
+("9.0" tarm64osx ("1ef7e34cc8c09018e5728998826c1dc13d8e0f7c" . "cfb32035f12122f85f69ba3ca514366d3ecca180") #"/Users/saulbolanos/TADA/game_tokenizer.rkt" #"/Users/saulbolanos/TADA/parser.rkt" (collects #"br" #"quicklang.rkt") (collects #"brag" #"support.rkt") (collects #"drracket" #"private" #"drracket-errortrace-key.rkt") (collects #"racket" #"runtime-config.rkt"))
+=======
+("9.0" ta6nt ("8d44c0a6e6ad19f7ab6c13a9b2241403e6510c49" . "110515880d67bf74dd9b51fb33970bba33d0c941") #"C:\\Users\\ouyel\\ProgrammingLang\\TADA\\game_tokenizer.rkt" #"C:\\Users\\ouyel\\ProgrammingLang\\TADA\\parser.rkt" (collects #"br" #"quicklang.rkt") (collects #"brag" #"support.rkt") (collects #"drracket" #"private" #"drracket-errortrace-key.rkt") (collects #"racket" #"runtime-config.rkt"))
+>>>>>>> 31e257112adb016a358c7437c2ede63f82abbf24
+>>>>>>> 0dd89ac2a1ff29d43c7de9e641e0037d380df29b

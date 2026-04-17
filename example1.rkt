@@ -1,5 +1,4 @@
 #lang reader "parse-only.rkt"
-
 create_room {
     name:       "cave"
     links:      ["windy hall", "forest entrance"]

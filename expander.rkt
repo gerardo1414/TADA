@@ -1,119 +1,64 @@
-#lang br/quicklang
+#lang racket
 
-;; expander.rkt
-;; Transforms parse tree nodes (from the command grammar) into runnable Racket.
-;;
-;; Pipeline reminder:
-;;   reader.rkt       → tokenizes player input
-;;   command-grammar  → parses tokens into a parse tree
-;;   THIS FILE        → macros transform parse tree into Racket function calls
-;;   runtime.rkt      → plain Racket functions that execute those calls
+(require "parse-only.rkt")  ; gives you access to read-syntax
+(require brag/support)
+(require "game_tokenizer.rkt")
+(require "parser.rkt")
 
-(require "runtime.rkt")
+(define (parse-file path)
+  (define port (open-input-file path))
+  (read-line port)  ; skip the #lang line
+  (define tree (parse path (make-tokenizer port path)))
+  (close-input-port port)
+  ; strip the outer syntax wrapper, get the raw list
+  (syntax->datum tree))
 
-;; ── #%module-begin ──────────────────────────────────────────────────────────
-;; Required by br/quicklang. Wraps all top-level forms in the .tada file.
-;; We intercept it here so we could add setup/teardown later (game intro, etc.)
-
-(define-syntax (tada-module-begin stx)
-  (syntax-case stx ()
-    [(_ body ...)
-     #'(#%module-begin body ...)]))
-
-(provide (rename-out [tada-module-begin #%module-begin]))
+; (require "final_project_racket.rkt") a placeholder function for gerardo, when expanded program runs
+(define (make-room name connections characters items x1 y1 x2 y2)
+  (displayln (format "Created room '~a', links: ~a" name connections))
+  (list name connections characters items x1 y1 x2 y2))
 
 
-;; ── noun-phrase ─────────────────────────────────────────────────────────────
-;; Strips articles and adjectives — we only care about the noun itself.
-;; The grammar can produce:
-;;   (noun-phrase "key")
-;;   (noun-phrase "the" "key")
-;;   (noun-phrase "a" "big" "door")
+;helper function below
+(define (clean-string s) (string-trim s "\"")) ;removes quotations from parsed strings
 
-(define-macro-cases noun-phrase
-  [(_ noun)             #'noun]
-  [(_ article noun)     #'noun]
-  [(_ article adj noun) #'noun])
+(define (extract-list val-node) ;This function processes parsed list values and extracts clean strings,
+                                ;filtering out commas and unnecessary structure from the parse tree.
+  (match val-node
+    [`(value ,items ...)
+     (filter-map (match-lambda
+                   [(? string? s) #:when (not (equal? s ",")) (clean-string s)]
+                   [`(value ,s) (clean-string s)]
+                   [_ #f])
+                 items)]))
 
+(define (extract-room-props pairs) ;walks through parsed room properties and extract specific fields, like room name and its ocnnections (as seen in example1 parse tree) 
+  (for/fold ([name ""] [links '()] #:result (values name links))
+            ([pair pairs])
+    (match pair
+      [`(room-property-pair (room-property "name")  (value ,s))  (values (clean-string s) links)]
+      [`(room-property-pair (room-property "links") ,val-node)   (values name (extract-list val-node))]
+      [_ (values name links)])))
 
-;; ── verb-phrase ─────────────────────────────────────────────────────────────
-;; Just extracts the verb string. Simple passthrough.
+;the actual expander here
+(define (expand node)
+  (match node
+    [`(program ,stmts ...) ;if node a program, recursively expand each statement and wrap them in a begin block so they execute sequentially in Racket.
+     `(begin ,@(map expand stmts))]
+    [`(room ,_ ,pairs ...) ; when encoutering room node, extract properties and make a racket define statement that creates the room using make-room.
+     (define-values (name links) (extract-room-props pairs))
+     `(define ,(string->symbol name) (make-room ,name ',links '() '() 0 0 10 10))] ;I convert the room name into a symbol so it can be used as a variable name, and then generate a call to make-room with the parsed data.
+    [else
+     (error (format "expand: unknown node: ~a" node))])) ;if node not recognized, give error
 
-(define-macro-cases verb-phrase
-  [(_ verb) #'verb])
+;entry port
+(define (expand-program parse-tree)
+  (define expanded (expand parse-tree))
+  (displayln "Expanded:") (pretty-print expanded) ;print expanded parse tree from example1
+  (displayln "Running:")
+  (define ns (make-base-namespace))
+  (namespace-set-variable-value! 'make-room make-room #t ns) ;“The code I generate runs in its own environment,
+                                                             ;so I have to manually give it access to the functions it needs, like make-room
+  (eval expanded ns) ) ;evals happen, try to remove the eval function - dark magic
 
-
-;; ── prep ────────────────────────────────────────────────────────────────────
-;; Just extracts the preposition string.
-
-(define-macro-cases prep
-  [(_ p) #'p])
-
-
-;; ── command ─────────────────────────────────────────────────────────────────
-;; This is the core macro. It pattern-matches on the shape of the parse tree
-;; and dispatches to the right runtime function.
-;;
-;; THIS is where syntax transformation happens:
-;;   (command (verb-phrase "take") (noun-phrase "the" "key"))
-;;   becomes →  (do-take "key")
-;;
-;; The macro runs at COMPILE TIME (expansion time), not at runtime.
-;; By the time the program runs, all (command ...) forms are gone —
-;; they've been replaced by plain Racket function calls.
-
-(define-macro-cases command
-
-  ;; Shape 1: bare verb only — "move", "exit", "inventory"
-  [(_ (verb-phrase v))
-   #'(cond
-       [(equal? v "move")      (do-move)]
-       [(equal? v "exit")      (do-exit)]
-       [(equal? v "talk")      (do-talk)]
-       [(equal? v "inventory") (do-inventory)]   ; TODO: wire up later
-       [else                   (do-unknown v)])]
-
-  ;; Shape 2: verb + bare noun — "take key"
-  [(_ (verb-phrase v) (noun-phrase n))
-   #'(cond
-       [(equal? v "take")    (do-take n)]
-       [(equal? v "pickup")  (do-pickup n)]
-       [(equal? v "drop")    (do-drop n)]        ; TODO: stub in runtime
-       [(equal? v "examine") (do-examine n)]
-       [(equal? v "talk")    (do-talk n)]
-       [(equal? v "enter")   (do-enter n)]
-       [(equal? v "exit")    (do-exit n)]
-       [(equal? v "move")    (do-move n)]
-       [else                 (do-unknown v)])]
-
-  ;; Shape 2b: verb + article + noun — "take the key"
-  [(_ (verb-phrase v) (noun-phrase art n))
-   #'(cond
-       [(equal? v "take")    (do-take n)]
-       [(equal? v "pickup")  (do-pickup n)]
-       [(equal? v "drop")    (do-drop n)]
-       [(equal? v "examine") (do-examine n)]
-       [(equal? v "talk")    (do-talk n)]
-       [(equal? v "enter")   (do-enter n)]
-       [(equal? v "exit")    (do-exit n)]
-       [(equal? v "move")    (do-move n)]
-       [else                 (do-unknown v)])]
-
-  ;; Shape 3: verb + noun + prep + noun — "put key on table"
-  [(_ (verb-phrase v) (noun-phrase n1) (prep p) (noun-phrase n2))
-   #'(cond
-       [(equal? v "put") (do-put n1 p n2)]
-       [else             (do-unknown v)])]
-
-  ;; Shape 3b: verb + article+noun + prep + article+noun
-  [(_ (verb-phrase v) (noun-phrase a1 n1) (prep p) (noun-phrase a2 n2))
-   #'(cond
-       [(equal? v "put") (do-put n1 p n2)]
-       [else             (do-unknown v)])])
-
-
-(provide verb-phrase
-         noun-phrase
-         prep
-         command
-         (all-from-out "runtime.rkt"))
+(expand-program (parse-file "example1.rkt"))

@@ -1,34 +1,22 @@
 #lang brag
 program      : section*
-<<<<<<< HEAD
-@section     : room | character
-
-room         : ROOM /LBRACE room-property-pair* /RBRACE
-room-property-pair: room-property /COLON value
-room-property: NAME | LINKS
-
-character    : "N/A"
-
-value        : STRING | list
-=======
 @section     : room | characters
 
 room         : ROOM /LBRACE room-property-pair* /RBRACE
 room-property-pair: room-property /COLON value
-room-property: NAME | LINKS | SIZE
+room-property : NAME | LINKS | SIZE | CHARACTERS | DIALOGUE | ITEMS | QUEST
 size         : list
 
 characters    : NAME | list | dialogue | quests
 
 items          : list
 
-dialogue       : STRING | list
-
 quests         : list
 
 
-value        : STRING | list 
+@value : STRING| list
+dialogue : STRING | list
 number       : INT | FLOAT
->>>>>>> cd769779b2a876b29aba209ddf161ad298f2d59f
 @list        : /LBRACKET list-items /RBRACKET
-@list-items  : [value] (COMMA value)*
+@list-items  : [value] (/COMMA value)*
+;;@string : /QUOTE /STRING-CONTENT /QUOTE
