@@ -49,7 +49,7 @@
      (define-values (name links) (extract-room-props pairs))
      `(define ,(string->symbol name) (make-room ,name ',links '() '() 0 0 10 10))] ;I convert the room name into a symbol so it can be used as a variable name, and then generate a call to make-room with the parsed data.
     [else
-     (error (format "expand: unknown node: ~a" node))]));if node not recognized, give error
+     (error (format "expand: unknown node: ~a" node))])) ;if node not recognized, give error
 
 ;entry port
 (define (expand-program parse-tree)
@@ -59,6 +59,6 @@
   (define ns (make-base-namespace))
   (namespace-set-variable-value! 'make-room make-room #t ns) ;“The code I generate runs in its own environment,
                                                              ;so I have to manually give it access to the functions it needs, like make-room
-  (eval expanded ns))
+  (eval expanded ns) ) ;evals happen, try to remove the eval function - dark magic
 
 (expand-program (parse-file "example1.rkt"))

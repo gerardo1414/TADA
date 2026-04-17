@@ -11,8 +11,10 @@
    ["}"  (token 'RBRACE "}")]
    [":"  (token 'COLON ":")]
 
-   [(from/to #\" #\")
-    (token 'STRING lexeme)]
+ 
+ [(:: #\" (:* (:~ #\")) #\")
+ (token 'STRING
+        (substring lexeme 1 (- (string-length lexeme) 1)))]
    
    ["["  (token 'LBRACKET "[")]
    ["]"  (token 'RBRACKET "]")]
@@ -23,9 +25,16 @@
 
    ; general properties
    ["name" (token 'NAME lexeme)]
+   ["size"       (token 'SIZE lexeme)]
+   ["characters" (token 'CHARACTERS lexeme)]
+   ["dialogue"   (token 'DIALOGUE lexeme)]
+   ["items"      (token 'ITEMS lexeme)]
+   ["quest"      (token 'QUEST lexeme)]
 
    ; room properties
    ["links" (token 'LINKS lexeme)]))
+
+  
 
 (define (make-tokenizer ip [path #f])
   (port-count-lines! ip)
