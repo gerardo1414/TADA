@@ -1,5 +1,5 @@
 #lang reader "parse-only.rkt"
  create_room {
-     name:"cave"
+     name: "cave"
      links:["tunnel", "dungeon"]
    }

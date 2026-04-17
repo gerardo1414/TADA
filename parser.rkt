@@ -18,6 +18,6 @@ quests         : list
 
 value        : STRING | list 
 number       : INT | FLOAT
->>>>>>> cd769779b2a876b29aba209ddf161ad298f2d59f
+;>>>>>>> cd769779b2a876b29aba209ddf161ad298f2d59f
 @list        : /LBRACKET list-items /RBRACKET
 @list-items  : [value] (COMMA value)*
