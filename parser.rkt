@@ -4,7 +4,7 @@ program      : section*
 
 room         : ROOM /LBRACE room-property-pair* /RBRACE
 room-property-pair: room-property /COLON value
-room-property: NAME | LINKS | SIZE
+room-property : NAME | LINKS | SIZE | CHARACTERS | DIALOGUE | ITEMS | QUEST
 size         : list
 
 characters    : NAME | list | dialogue | quests
@@ -14,7 +14,7 @@ items          : list
 quests         : list
 
 
-value : STRING| list
+@value : STRING| list
 dialogue : STRING | list
 number       : INT | FLOAT
 @list        : /LBRACKET list-items /RBRACKET
