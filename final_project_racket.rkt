@@ -12,7 +12,7 @@
 (define (item-value item) (list-ref item 2))
 (define (item-actions item) (list-ref item 3))
 
-; Maybe give items coordinates
+; Maybe give items coordinatesq
 
 ; check if an item can do the action
 (define (item-can? item action)
@@ -155,43 +155,55 @@
                      (pos-y     player-pos)
                      (pos-floor player-pos))))
 
-; set player position using mutability
-(define (move! x y z)
-  (set! player-pos
-        (make-pos (+ (pos-x player-pos) x)
-                  (+ (pos-y player-pos) y)
-                  (+ (pos-floor player-pos) z))))
+; attempt to move by (dx dy), checks bounds and doors before moving
+(define (try-move! dx dy direction-name)
+  
+  (let* (
+         (new-x (+ (pos-x player-pos) dx))
+         (new-y (+ (pos-y player-pos) dy)))
+    (cond
+      ; new position is within room bounds move free
+      ((in-room? current-room new-x new-y)
+       
+       (set! player-pos (make-pos new-x new-y (pos-floor player-pos)))
+       (displayln (format "You move ~a." direction-name)))
+      ; Claude asissted code:
+      ; new position is outside bounds, check if current position is a door
+      (else
+       (let ((conn (room-door-at? current-room (pos-x player-pos) (pos-y player-pos))))
+         (cond
+           (conn  (enter-room! (connection-name conn)))
+           (else  (displayln "You walk into a wall."))))))))
 
-; movement actions
-(define (move-right)
-  (move! -1 0 0)
-  (displayln "You move right"))
+; movement functions
+(define (move-right) (try-move! -1  0 "right"))
+(define (move-left) (try-move!  1  0 "left"))
+(define (move-forward) (try-move!  0  1 "forward"))
+(define (move-backward) (try-move!  0 -1 "backward"))
 
-(define (move-left)
-  (move! 1 0 0)
-  (displayln "You move left"))
-
-(define (move-forward)
-  (move! 0 1 0)
-  (displayln "You move forward"))
-
-(define (move-backward)
-  (move! 0 -1 0)
-  (displayln "You move backward"))
-
-; wander action IMPLEMENT CHECK FOR ROOM SIZE
+; wander function
 (define (wander)
-  ; generate random value to add 
-  (let ((x (random 1 4))
-        (y (random 1 4)))
-    ; change player position based on the values
-    (set! player-pos
-          (make-pos (+ (pos-x player-pos) x)
-                    (+ (pos-y player-pos) y)
-                    (pos-floor player-pos)))
+  (let ((new-x (+ (room-x1 current-room)
+                  (random (+ (- (room-x2 current-room) (room-x1 current-room)) 1))))
+        
+        (new-y (+ (room-y1 current-room)
+                  (random (+ (- (room-y2 current-room) (room-y1 current-room)) 1)))))
+    
+    (set! player-pos (make-pos new-x new-y (pos-floor player-pos)))
     (displayln "You wander around the room...")
     (curr-pos)))
 
+; connections for rooms
+(define (make-connection room-name door-x door-y)
+  
+  (list room-name door-x door-y))
+
+; connection accessors
+(define (connection-name conn) (list-ref conn 0))
+
+(define (connection-x conn) (list-ref conn 1))
+
+(define (connection-y conn) (list-ref conn 2))
 
 
 ;               ROOMS
@@ -217,28 +229,140 @@
 
 (define (room-y2 room) (list-ref room 7))
 
+; room registry
+(define rooms '())
+
+; register room
+(define (room-register! room)
+  
+  (set! rooms (append rooms (list room))))
+
+; find room
+; Claude assisted code:
+(define (room-find name)
+  (findf (lambda (r) (string-ci=? (room-name r) name)) rooms))
+
+; check if coordinates are within room bounds
+(define (in-room? room x y)
+  
+  (and (>= x (room-x1 room)) (<= x (room-x2 room))
+       (>= y (room-y1 room)) (<= y (room-y2 room))))
+
+; find door
+; Claude semi assisted code
+(define (room-door-at? room x y)
+  
+  (findf (lambda (c) (and (= (connection-x c) x)
+                          (= (connection-y c) y)))
+         (room-connections room)))
+
+; room tracker
+; current room the player is in
+(define current-room #f)
+
+; items on the floor in the current room
+(define floor-items '())
+
+; remove items from rooms
+(define (floor-remove! name)
+  
+  (set! floor-items
+        (filter (lambda (i) (not (string-ci=? (item-name i) name)))
+                floor-items)))
+
+; enter a new room
+; Claude assisted code
+(define (enter-room! dest-name)
+  
+  (let* ((dest (room-find dest-name))
+         ; find the connection in dest that leads back to where we came from
+         (return-conn (findf (lambda (c) (string-ci=? (connection-name c) (room-name current-room)))
+                             (room-connections dest))))
+    (set! current-room dest)
+    (set! player-pos   (make-pos (connection-x return-conn)
+                                 (connection-y return-conn)
+                                 (pos-floor player-pos)))
+    (set! floor-items  (room-items dest))
+    (displayln (format "You enter ~a." (room-name dest)))))
 
 
 ;               QUESTS
 
 ; quest constructor
 ; completed? is a flag that is initialized as false
-(define (make-quest description target-room reward-items)
+(define (make-quest description target-items reward-items giver)
   
-  (list description target-room reward-items #f))
+  (list description target-items reward-items giver #f #f))
 
 (define (quest-desc quest) (list-ref quest 0))
 
-(define (quest-target quest) (list-ref quest 1))
+(define (quest-targets quest) (list-ref quest 1))
 
 (define (quest-rewards quest) (list-ref quest 2))
 
-(define (quest-completed? quest) (list-ref quest 3))
+(define (quest-giver quest) (list-ref quest 3))
 
-; mark a quest as complete, we rebuild the quest but this time we set the flag as true
-(define (quest-complete! quest)
+(define (quest-assigned? quest) (list-ref quest 4))
+
+(define (quest-completed? quest) (list-ref quest 5))
+
+; assigns the quest by setting element 4 to true, rebuilds quest
+(define (quest-assign quest)
   
-  (list (quest-desc quest) (quest-target quest) (quest-rewards quest) #t))
+  (list (quest-desc quest) (quest-targets quest) (quest-rewards quest) (quest-giver quest) #t #f))
+
+(define (quest-complete quest)
+  
+  (list (quest-desc quest) (quest-targets quest) (quest-rewards quest) (quest-giver quest) #t #t))
+
+; list of all quests
+(define quests '())
+
+; registers quests
+(define (quest-register! quest)
+  
+  (set! quests (append quests (list quest))))
+
+; Claude assisted code:
+; assigns quest by looping through the quests searching by desc
+(define (quest-assign! desc)
+  (set! quests
+        (map (lambda (q)
+               (if (string-ci=? (quest-desc q) desc)
+                   (quest-assign q)
+                   q))
+             quests)))
+
+; Claude assisted code:
+; check if quest is ready to be finished
+(define (npc-quest-ready? npc-name)
+  (findf (lambda (q)
+           (and (string-ci=? (quest-giver q) npc-name)
+                (quest-assigned? q)
+                (not (quest-completed? q))
+                (andmap inventory-find (quest-targets q))))
+         quests))
+
+; turns in the quest
+(define (quest-turn-in! quest npc-name)
+  ; maybe later do not hard code the response
+  (displayln (format "~%~a: A deal's a deal" npc-name))
+  
+  (for ((target (quest-targets quest)))
+    (inventory-remove! target)
+    (displayln (format "  You hand over: ~a." target)))
+  
+  (for ((reward (quest-rewards quest)))
+    (inventory-add! reward)
+    (displayln (format "  You receive: ~a." (item-name reward))))
+  
+  ; Claude assisted code
+  (set! quests
+        (map (lambda (q)
+               (if (string-ci=? (quest-desc q) (quest-desc quest))
+                   (quest-complete q)
+                   q))
+             quests)))
 
 
 ;               NPC
@@ -292,6 +416,11 @@
 
 ; talk-to
 (define (talk-to npc)
+  ; check if the player is ready to turn in a quest to this npc
+  (let ((ready (npc-quest-ready? (npc-name npc))))
+    (when ready
+      (quest-turn-in! ready (npc-name npc))))
+  
   (let loop ((node (npc-dialogue npc)))
     (let ((npc-lines (car node))
           (next-opts (cadr node)))
@@ -299,7 +428,6 @@
       ; loops through all npc lines and prints them before options appear
       (for ((line npc-lines))
         (displayln (format "~a: ~a" (npc-name npc) line)))
-
       ; checks if there are any options left, if '() is read then the conversation is over
       (cond
         ((or (null? next-opts)
@@ -309,7 +437,6 @@
          ; loops over the options/hash, prints with corresponding number
          (for (((key val) (in-hash next-opts)))
            (displayln (format "  ~a. ~a" key (car val))))
-
          (let ((choice (read)))
            (cond
              ; hash-has-key checks if the inputted number exists in the hash
@@ -385,11 +512,53 @@
     ((equal? args "right")    (move-right))
     (else (displayln (format "Unknown direction: '~a'" args)))))
 
+
+
+
+; outputs te direction and distance of a door from the player
+(define (door-hint conn)
+  (let* ((dx (- (connection-x conn) (pos-x player-pos)))
+         (dy (- (connection-y conn) (pos-y player-pos)))
+         ; Claude helped with the math here
+         (dist (+ (abs dx) (abs dy)))
+         ; pick which cardinal direction is closest
+         (dir (cond ((and (> (abs dy) (abs dx)) (> dy 0)) "north")
+                    ((and (> (abs dy) (abs dx)) (< dy 0)) "south")
+                    ((> dx 0) "east")
+                    (else     "west"))))
+    (format "A door to ~a (~a) is ~a step~a away."
+            (connection-name conn) dir dist (if (= dist 1) "" "s"))))
+
+; look around, shows items on the floor and nearby doors
+(define (look)
+  ; items
+  (cond
+    ((null? floor-items)
+     (displayln "You don't see anything of interest on the ground."))
+    (else
+     (displayln "On the ground: ")
+     (for ((item floor-items))
+       (displayln (format "  ~a" (item-name item))))))
+  ; doors
+  (displayln "Doors: ")
+  (for ([conn (room-connections current-room)])
+    (displayln (format "  ~a" (door-hint conn)))))
+
+; take from floor
 (define (handle-take args)
-  (displayln "Taking from room not yet implemented."))
+  
+  (let ((found (findf (lambda (i) (string-ci=? (item-name i) args))
+                      floor-items)))
+    (cond
+      ((not found)
+       (displayln (format "You don't see '~a' here." args)))
+      (else
+       (take found)
+       (floor-remove! args)))))
 
 (define (help)
   (displayln "Commands: move [forward/backward/left/right]")
+  (displayln "          look")
   (displayln "          talk [name]")
   (displayln "          take [item]")
   (displayln "          drop [item]")
@@ -402,7 +571,6 @@
 (define (parse-input input)
   ; claude helped me here
   (let ((parts (string-split input)))
-    
     (cond
       ((null? parts) (displayln "Please enter a command."))
       (else
@@ -410,15 +578,15 @@
              (args    (string-join (cdr parts) " ")))
          (cond
            ((equal? command "move")      (handle-move args))
+           ((equal? command "look")      (look))
            ((equal? command "take")      (handle-take args))
            ((equal? command "drop")      (drop args))
            ((equal? command "inspect")   (inspect-inventory args))
            ((equal? command "inventory") (inventory-show))
            ((equal? command "wander")    (wander))
            ((equal? command "talk")      (handle-talk args))
-           ((equal? command "help")     (help))
+           ((equal? command "help")      (help))
            (else (displayln (format "Unknown command: '~a'" command)))))))))
-
 ; input loop
 (define (game-loop)
   
@@ -471,24 +639,29 @@
 ; rooms
 (define bar
   (make-room "The Bar"
-             '("bathroom" "kitchen")  ; connections
-             '()                      ; characters added after
-             (list beer bread)        ; items
-             0 0 10 10))              ; x1 y1 x2 y2
+             (list (make-connection "Bathroom" 10 5)
+                   (make-connection "Kitchen"   5 10))
+             '()
+             (list beer bread trinket)
+             0 0 10 10))
 
 (define bathroom
   (make-room "Bathroom"
-             '("bar")
+             (list (make-connection "The Bar" 11 5))
              '()
              (list mop)
              11 0 15 10))
 
 (define kitchen
   (make-room "Kitchen"
-             '("bar")
+             (list (make-connection "The Bar" 5 11))
              '()
              (list knife)
              0 11 10 15))
+
+(room-register! bar)
+(room-register! bathroom)
+(room-register! kitchen)
 
 (define bartender
   (make-npc "Bartender"
@@ -504,9 +677,8 @@
                                                (begin
                                                  (gold-spend! 5)
                                                  (inventory-add! beer)
-                                                 (displayln "You now have a beer.")
                                                  '("Cheers! Enjoy your drink."))
-                                               '("Hey, you're a bit short. Come back when you've got the gold.")))
+                                               '("You're a bit short. Come back when you have the gold.")))
                                          '())
                             (make-option "Actually nevermind."
                                          '("Suit yourself.")
@@ -526,22 +698,37 @@
                             (make-option "What if I do?"
                                          '("Then we're gonna have a problem, friend.")
                                          '())))
-              (make-option "I've got something you might want..."
+              (make-option "You look like you need something."
                            (lambda ()
-                             (if (inventory-find "Peculiar Trinket")
-                                 (begin
-                                   (inventory-remove! "Peculiar Trinket")
-                                   (inventory-add! beer)
-                                   '("Well I'll be... I've been looking for one of these for years. Here, take a beer on me."))
-                                 '("Hm? You've got nothing worth my time, friend.")))
+                             (let ((q (findf (lambda (q)
+                                              (and (string-ci=? (quest-giver q) "Bartender")
+                                                   (not (quest-assigned? q))))
+                                            quests)))
+                               (if q
+                                   (begin
+                                     (quest-assign! (quest-desc q))
+                                     '("Actually yeah... I lost a peculiar little trinket somewhere in here."
+                                       "Odd little thing, catches the light strangely."
+                                       "Find it and bring it back to me. I'll make it worth your while."))
+                                   '("Nah I'm good. Drink up."))))
                            '())
               (make-option "Goodbye."
                            '("Take care now.")
                            '())))
             '()
             '()))
+
 (npc-register! bartender)
 
+; register the trinket quest (not yet assigned — bartender gives it during dialogue)
+(quest-register!
+  (make-quest "Find the Bartender's Trinket"
+              '("Peculiar Trinket")
+              (list (make-item "Coin Pouch"
+                               "A small pouch of coins tied with twine."
+                               15
+                               '(take drop inspect)))
+              "Bartender"))
 
 ; friend npc
 (define friend
@@ -575,8 +762,10 @@
 (npc-register! friend)
 
 
-; main
+; main - make sure to use provide when saul is ready with the expander
 (define (main)
+  (set! current-room bar)
+  (set! floor-items  (room-items bar))
   (displayln "===========================================")
   (displayln "   Welcome to The Rusty Flagon            ")
   (displayln "===========================================")
@@ -587,6 +776,7 @@
   (displayln "Something glimmers by your foot.")
   (displayln "")
   (displayln "Commands: move [forward/backward/left/right]")
+  (displayln "          look")
   (displayln "          talk [name]")
   (displayln "          take [item]")
   (displayln "          drop [item]")
