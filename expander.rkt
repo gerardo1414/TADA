@@ -1,64 +1,89 @@
-#lang racket
-
-(require "parse-only.rkt")  ; gives you access to read-syntax
-(require brag/support)
+#lang br/quicklang
 (require "game_tokenizer.rkt")
 (require "parser.rkt")
+(require brag/support)
 
-(define (parse-file path)
-  (define port (open-input-file path))
-  (read-line port)  ; skip the #lang line
-  (define tree (parse path (make-tokenizer port path)))
-  (close-input-port port)
-  ; strip the outer syntax wrapper, get the raw list
-  (syntax->datum tree))
-
-; (require "final_project_racket.rkt") a placeholder function for gerardo, when expanded program runs
+; runtime (swap for require when Gerardo fixes his file)
 (define (make-room name connections characters items x1 y1 x2 y2)
-  (displayln (format "Created room '~a', links: ~a" name connections))
+  (displayln (format "Room created: ~a" name))
+  (displayln (format "  Links: ~a" connections))
   (list name connections characters items x1 y1 x2 y2))
 
+(define (room-name r)        (list-ref r 0))
+(define (room-connections r) (list-ref r 1))
 
-;helper function below
-(define (clean-string s) (string-trim s "\"")) ;removes quotations from parsed strings
+; SYNTAX HELPERS (phase 1, mirrors professor's pattern)
+(begin-for-syntax
+  (require racket/list)
 
-(define (extract-list val-node) ;This function processes parsed list values and extracts clean strings,
-                                ;filtering out commas and unnecessary structure from the parse tree.
-  (match val-node
-    [`(value ,items ...)
-     (filter-map (match-lambda
-                   [(? string? s) #:when (not (equal? s ",")) (clean-string s)]
-                   [`(value ,s) (clean-string s)]
-                   [_ #f])
-                 items)]))
+  ; find-property: searches a list of syntax nodes for one that
+  ; starts with a given symbol, returns the rest of its contents
+  ; mirrors professor's find-property exactly
+  (define (find-property which stx-list)
+    (for/first ([stx (in-list (syntax->list stx-list))]
+                #:when (and (syntax->list stx)
+                            (eq? which (syntax->datum
+                                        (car (syntax->list stx))))))
+      (cdr (syntax->list stx))))  ; return all children, not just first
 
-(define (extract-room-props pairs) ;walks through parsed room properties and extract specific fields, like room name and its ocnnections (as seen in example1 parse tree) 
-  (for/fold ([name ""] [links '()] #:result (values name links))
-            ([pair pairs])
-    (match pair
-      [`(room-property-pair (room-property "name")  (value ,s))  (values (clean-string s) links)]
-      [`(room-property-pair (room-property "links") ,val-node)   (values name (extract-list val-node))]
-      [_ (values name links)])))
+  ; find-definitions: like find-property but returns ALL matching nodes
+  ; mirrors professor's find-definitions exactly
+  (define (find-definitions which stx-list)
+    (for/list ([stx (in-list (syntax->list stx-list))]
+               #:when (and (syntax->list stx)
+                           (eq? which (syntax->datum
+                                       (car (syntax->list stx))))))
+      stx)))
 
-;the actual expander here
-(define (expand node)
-  (match node
-    [`(program ,stmts ...) ;if node a program, recursively expand each statement and wrap them in a begin block so they execute sequentially in Racket.
-     `(begin ,@(map expand stmts))]
-    [`(room ,_ ,pairs ...) ; when encoutering room node, extract properties and make a racket define statement that creates the room using make-room.
-     (define-values (name links) (extract-room-props pairs))
-     `(define ,(string->symbol name) (make-room ,name ',links '() '() 0 0 10 10))] ;I convert the room name into a symbol so it can be used as a variable name, and then generate a call to make-room with the parsed data.
-    [else
-     (error (format "expand: unknown node: ~a" node))])) ;if node not recognized, give error
 
-;entry port
-(define (expand-program parse-tree)
-  (define expanded (expand parse-tree))
-  (displayln "Expanded:") (pretty-print expanded) ;print expanded parse tree from example1
-  (displayln "Running:")
-  (define ns (make-base-namespace))
-  (namespace-set-variable-value! 'make-room make-room #t ns) ;“The code I generate runs in its own environment,
-                                                             ;so I have to manually give it access to the functions it needs, like make-room
-  (eval expanded ns) ) ;evals happen, try to remove the eval function - dark magic
+; macros (following professor's define-macro style)
+; expands a room node into a define that calls make-room
+; (room "create_room" (name "cave") (links "a" "b") ...)
+; →
+; (define cave (make-room "cave" '("a" "b") '() '() 0 0 10 10))
+(define-macro (room KEYWORD FEATURE ...)
+  #'(begin
+      (displayln "--- room macro ran ---")
+      (displayln (format "  features: ~a" '(FEATURE ...)))))
 
-(expand-program (parse-file "example1.rkt"))
+; expands a character node — ignored for now
+(define-macro (character KEYWORD FEATURE ...)
+    #'(displayln "--- character macro ran (ignored for now) ---"))
+
+
+; top-level: expands the whole program
+; (program room-defn ... char-defn ...)
+; →
+; (#%module-begin (define cave ...) (define windy-hall ...) ...)
+;(define-macro (program DEFN ...)
+ ; (with-pattern
+  ;  ([(ROOM-DEFN ...)  (find-definitions 'room      #'(DEFN ...))]
+   ;  [(CHAR-DEFN ...)  (find-definitions 'character #'(DEFN ...))])
+    ;#'(#%module-begin
+     ; (displayln "=== expander running ===")
+      ; (displayln (format "rooms found: ~a" '(ROOM-DEFN ...)))
+       ;ROOM-DEFN ...
+       ;CHAR-DEFN ...
+       ;(displayln "=== done ==="))))
+
+(define-macro (program DEFN ...)
+  #'(#%module-begin
+     (displayln "=== expander running ===")
+     (displayln (format "all defns: ~a" '(DEFN ...)))
+     (displayln "=== done ===")))
+
+(define (read-syntax path port)
+  (read-line port)
+  (define parse-tree (parse path (make-tokenizer port path)))
+  ; parse-tree is (program (room ...) (room ...))
+  ; we need to splice its children directly into the module
+  (define tree-datum (syntax->datum parse-tree))
+  (define children (cdr tree-datum))  ; strip the 'program wrapper
+  (strip-bindings
+   #`(module game-mod "expander.rkt"
+       #,@(map (lambda (c) (datum->syntax parse-tree c))
+               children))))
+
+(provide read-syntax)
+(provide (rename-out [program #%module-begin]))
+(provide room character make-room)
