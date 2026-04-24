@@ -1,22 +1,31 @@
 #lang brag
-program      : section*
-@section     : room | characters
 
-room         : ROOM /LBRACE room-property-pair* /RBRACE
-room-property-pair: room-property /COLON value
-room-property : NAME | LINKS | SIZE | CHARACTERS | DIALOGUE | ITEMS | QUEST
-size         : list
-
-characters    : NAME | list | dialogue | quests
-
-items          : list
-
-quests         : list
+;               PROGRAM
+program    : section*
+@section   : room | character
 
 
-@value : STRING| list
-dialogue : STRING | list
-number       : INT | FLOAT
-@list        : /LBRACKET list-items /RBRACKET
-@list-items  : [value] (/COMMA value)*
-;;@string : /QUOTE /STRING-CONTENT /QUOTE
+;               ROOM
+room       : ROOM /LBRACE room-prop* /RBRACE
+
+@room-prop : name | links | size | characters | items | dialogue | quest
+
+name       : /NAME STRING
+links      : /LINKS str-list
+size       : /SIZE str-list
+characters : /CHARACTERS str-list
+items      : /ITEMS str-list
+dialogue   : /DIALOGUE str-list
+quest      : /QUEST str-list
+
+
+;               CHARACTER
+character  : CHARACTER /LBRACE char-prop* /RBRACE
+
+@char-prop : name | char-room | dialogue | items | quest
+
+char-room  : /ROOM-PROP STRING
+
+
+;               SHARED
+@str-list   : /LBRACKET [STRING (/COMMA STRING)*] /RBRACKET

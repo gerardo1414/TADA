@@ -1,4 +1,5 @@
 #lang reader "parse-only.rkt"
+
 create_room {
     name:       "cave"
     links:      ["windy hall", "forest entrance"]
@@ -12,9 +13,25 @@ create_room {
 create_room {
     name:       "windy hall"
     links:      ["cave", "dungeon"]
-    size:       [4 4 5 5]
+    size:       ["4 4 5 5"]
     characters: ["ghost"]
-    dialogue:   ["ooooooo"]
+    dialogue:   ["Ooooooo."]
     items:      ["lantern"]
     quest:      ["escape the dungeon"]
+}
+
+create_character {
+    name:       "old hermit"
+    room:       "cave"
+    dialogue:   ["Who goes there?", "Leave me be.", "...I may know where the sword lies."]
+    items:      ["walking stick", "worn map"]
+    quest:      ["find the lost sword"]
+}
+
+create_character {
+    name:       "ghost"
+    room:       "windy hall"
+    dialogue:   ["Ooooooo.", "I died here long ago."]
+    items:      ["spectral lantern"]
+    quest:      ["lay the ghost to rest"]
 }

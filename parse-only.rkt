@@ -3,14 +3,23 @@
          "game_tokenizer.rkt"
          brag/support)
 
-(define (read-syntax path port)
-  (define parse-tree (parse path (make-tokenizer port path)))
-  (strip-bindings
-   #`(module smpl-parser-mod "parse-only.rkt"
-       #,parse-tree)))
-(provide read-syntax)
+;               READER
 
-(define-macro (parser-only-mb PARSE-TREE)
-  #'(#%module-begin
-     'PARSE-TREE))
-(provide (rename-out [parser-only-mb #%module-begin]))
+(provide (rename-out [my-read read]
+                     [my-read-syntax read-syntax]))
+
+(define (my-read in)
+  (syntax->datum (my-read-syntax #f in)))
+
+(define (my-read-syntax path port)
+  (define tree (parse path (make-tokenizer port path)))
+  (define datum (syntax->datum tree))
+
+  ; print each section on its own line
+  (for ([section (cdr datum)])
+    (writeln section))
+
+  ; wrap in a valid module so Racket accepts it
+  (datum->syntax #f
+    `(module example racket
+       (quote ,datum))))
