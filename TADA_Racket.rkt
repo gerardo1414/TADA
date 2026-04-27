@@ -181,8 +181,8 @@
            (else  (displayln "You walk into a wall."))))))))
 
 ; movement functions
-(define (move-right) (try-move! -1  0 "right"))
-(define (move-left) (try-move!  1  0 "left"))
+(define (move-right) (try-move! 1  0 "right"))
+(define (move-left) (try-move!  -1  0 "left"))
 (define (move-forward) (try-move!  0  1 "forward"))
 (define (move-backward) (try-move!  0 -1 "backward"))
 
