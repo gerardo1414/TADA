@@ -1,4 +1,4 @@
-#lang reader "parse-only.rkt"
+#lang reader "expander.rkt"
 
 create_room {
     name:       "cave"

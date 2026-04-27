@@ -8,6 +8,7 @@
   (displayln (format "Room created: ~a" name))
   (displayln (format "  Links: ~a" connections))
   (list name connections characters items x1 y1 x2 y2))
+
 (define (room-name r)        (list-ref r 0))
 (define (room-connections r) (list-ref r 1))
 
@@ -40,10 +41,11 @@
 ; (room "create_room" (name "cave") (links "a" "b") ...)
 ; →
 ; (define cave (make-room "cave" '("a" "b") '() '() 0 0 10 10))
-(define-macro (room KEYWORD FEATURE ...)
+(define-macro (room NAME FEATURE ...)
   #'(begin
       (displayln "--- room macro ran ---")
-      (displayln (format "  features: ~a" '(FEATURE ...)))))
+      (displayln (format "  features: ~a" '(FEATURE ...)))
+      (room-register! (make-room ...))))
 
 ; expands a character node — ignored for now
 (define-macro (character KEYWORD FEATURE ...)
@@ -54,22 +56,23 @@
 ; (program room-defn ... char-defn ...)
 ; →
 ; (#%module-begin (define cave ...) (define windy-hall ...) ...)
-;(define-macro (program DEFN ...)
- ; (with-pattern
-  ;  ([(ROOM-DEFN ...)  (find-definitions 'room      #'(DEFN ...))]
-   ;  [(CHAR-DEFN ...)  (find-definitions 'character #'(DEFN ...))])
-    ;#'(#%module-begin
-     ; (displayln "=== expander running ===")
-      ; (displayln (format "rooms found: ~a" '(ROOM-DEFN ...)))
-       ;ROOM-DEFN ...
-       ;CHAR-DEFN ...
-       ;(displayln "=== done ==="))))
-
 (define-macro (program DEFN ...)
-  #'(#%module-begin
-     (displayln "=== expander running ===")
-     (displayln (format "all defns: ~a" '(DEFN ...)))
-     (displayln "=== done ===")))
+  (with-pattern
+    ([(ROOM-DEFN ...)  (find-definitions 'room      #'(DEFN ...))]
+     [(CHAR-DEFN ...)  (find-definitions 'character #'(DEFN ...))])
+    #'(#%module-begin
+      (displayln "=== expander running ===")
+      ; (displayln (format "rooms found: ~a" '(ROOM-DEFN ...)))
+      ROOM-DEFN ...
+      ; CHAR-DEFN ...
+      (game-loop)
+       (displayln "=== done ==="))))
+
+;(define-macro (program DEFN ...)
+ ; #'(#%module-begin
+  ;   (displayln "=== expander running ===")
+   ;  (displayln (format "all defns: ~a" '(DEFN ...)))
+    ; (displayln "=== done ===")))
 
 (define (read-syntax path port)
   (read-line port)
