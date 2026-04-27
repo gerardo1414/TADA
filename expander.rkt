@@ -8,7 +8,6 @@
   (displayln (format "Room created: ~a" name))
   (displayln (format "  Links: ~a" connections))
   (list name connections characters items x1 y1 x2 y2))
-
 (define (room-name r)        (list-ref r 0))
 (define (room-connections r) (list-ref r 1))
 
