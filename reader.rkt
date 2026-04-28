@@ -1,6 +1,6 @@
 #lang br/quicklang
-(require "parser.rkt"
-         "tokenizer.rkt"
+(require "game_parser.rkt"
+         "game_tokenizer.rkt"
          brag/support)
 
 (define (read-syntax src port)
