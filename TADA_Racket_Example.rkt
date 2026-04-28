@@ -21,13 +21,13 @@
   (make-item "Kitchen Knife"
              "A very sharp knife used for cooking. Probably shouldn't take this."
              10
-             '(inspect)))
+             '(take drop inspect)))
 
 (define mop
   (make-item "Mop"
              "A dirty mop leaning against the bathroom wall."
              1
-             '(inspect)))
+             '(take drop inspect)))
 
 (define trinket
   (make-item "Peculiar Trinket"
@@ -40,21 +40,21 @@
   (make-room "The Bar"
              (list (make-connection "Bathroom" 10 5)
                    (make-connection "Kitchen"   5 10))
-             '()
-             (list beer bread trinket)
+             (list "Bartender" "Friend")
+             (list beer bread)          ; trinket moved to bathroom
              0 0 10 10))
 
 (define bathroom
   (make-room "Bathroom"
              (list (make-connection "The Bar" 11 5))
              '()
-             (list mop)
+             (list mop trinket)         ; trinket now here
              11 0 15 10))
 
 (define kitchen
   (make-room "Kitchen"
              (list (make-connection "The Bar" 5 11))
-             '()
+             (list "Chef")              ; chef added
              (list knife)
              0 11 10 15))
 
@@ -69,7 +69,6 @@
              (list
               (make-option "I'll have a beer."
                            '("Coming right up. That'll be 5 gold.")
-
                            (list
                             (make-option "Here you go."
                                          (lambda ()
@@ -161,30 +160,44 @@
 
 (npc-register! friend)
 
-; main - make sure to use provide when saul is ready with the expander
-(define (main)
-  (set-current-room! bar)
-  (set-floor-items!  (room-items bar))
-  (displayln "===========================================")
-  (displayln "   Welcome to The Rusty Flagon            ")
-  (displayln "===========================================")
-  (displayln "You step into a dimly lit bar.")
-  (displayln "The smell of ale and sawdust fills the air.")
-  (displayln "A bartender wipes down the counter.")
-  (displayln "Your friend waves at you from a nearby stool.")
-  (displayln "Something glimmers by your foot.")
-  (displayln "")
-  (displayln "Commands: move [forward/backward/left/right]")
-  (displayln "          look")
-  (displayln "          talk [name]")
-  (displayln "          take [item]")
-  (displayln "          drop [item]")
-  (displayln "          inspect [item]")
-  (displayln "          inventory")
-  (displayln "          wander")
-  (displayln "          quit")
-  (displayln "===========================================")
-  (displayln "")
-  (game-loop))
+; chef npc — guards the kitchen, reacts to knife in inventory
+(define chef
+  (make-npc "Chef"
+            (make-dialogue-node
+             ; chef greeting reacts to whether the player has the knife
+             (lambda ()
+               (if (inventory-find "Kitchen Knife")
+                   '("Hey! Is that MY knife?! Put that back or I'll throw you out myself!")
+                   '("Hey! Customers aren't allowed back here. Get out!")))
+             (list
+              (make-option "Sorry, I was just looking around."
+                           '("Well look somewhere else. This is my kitchen.")
+                           (list
+                            (make-option "Fair enough, I'm leaving."
+                                         '("Good. And stay out.")
+                                         '())))
+              (make-option "I'll leave when I want."
+                           (lambda ()
+                             (if (inventory-find "Kitchen Knife")
+                                 '("That's it, get out before I call the bartender over here!"
+                                   "And put that knife DOWN.")
+                                 '("Bold words. Get out anyway.")))
+                           (list
+                            (make-option "Okay okay, I'm going."
+                                         '("That's what I thought.")
+                                         '())))
+              (make-option "Goodbye."
+                           '("Don't come back.")
+                           '())))
+            '()
+            '()))
 
-(main)
+(npc-register! chef)
+
+; main
+(make-main bar
+           "   Welcome to The Rusty Flagon"
+           '("You step into a dimly lit bar."
+             "The smell of ale and sawdust fills the air."
+             "A bartender wipes down the counter."
+             "Your friend waves at you from a nearby stool."))

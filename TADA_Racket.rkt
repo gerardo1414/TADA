@@ -116,6 +116,7 @@
       ; check if we can drop item (quest item or the item is cursed so it cannot be dropped)
       ((item-can? found 'drop)
        (inventory-remove! name)
+       (set! floor-items (append floor-items (list found)))  ; add to current room floor
        (displayln (format "You dropped: ~a." (item-name found))))
       
       (else
@@ -171,7 +172,9 @@
       ((in-room? current-room new-x new-y)
        
        (set! player-pos (make-pos new-x new-y (pos-floor player-pos)))
-       (displayln (format "You move ~a." direction-name)))
+       (displayln (format "You move ~a." direction-name))
+       (when (player-in-doorway?)
+         (displayln "You are standing in a doorway.")))
       ; Claude asissted code:
       ; new position is outside bounds, check if current position is a door
       (else
@@ -185,6 +188,15 @@
 (define (move-left) (try-move!  -1  0 "left"))
 (define (move-forward) (try-move!  0  1 "forward"))
 (define (move-backward) (try-move!  0 -1 "backward"))
+
+; move in a certain direciton a certain number of times
+(define (move-n direction n)
+  (for ((i n))
+    (cond
+      ((equal? direction "forward")  (move-forward))
+      ((equal? direction "backward") (move-backward))
+      ((equal? direction "left")     (move-left))
+      ((equal? direction "right")    (move-right)))))
 
 ; wander function
 (define (wander)
@@ -274,22 +286,52 @@
 (define (floor-remove! name)
   
   (set! floor-items
-        (filter (lambda (i) (not (string-ci=? (item-name i) name)))
-                floor-items)))
+        (filter (lambda (i) (not (string-ci=? (item-name i) name))) floor-items)))
+
+; nudge player one step inside the room so they are not sitting on door
+(define (nudge-inward room pos)
+  (let* ((x (pos-x pos))
+         (y (pos-y pos))
+         (f (pos-floor pos)))
+    (cond
+      ((= x (room-x1 room)) (make-pos (+ x 1) y f))  ; left edge push right
+      ((= x (room-x2 room)) (make-pos (- x 1) y f))  ; right edge push left
+      ((= y (room-y1 room)) (make-pos x (+ y 1) f))  ; bottom push up
+      ((= y (room-y2 room)) (make-pos x (- y 1) f))  ; top push down
+      (else pos))))
+
+; persistent item state per room, survives transitions
+(define room-states (make-hash))
+
+; returns the current items for a room, falling back to original if unvisited
+(define (room-current-items room-name)
+  (if (hash-has-key? room-states room-name)
+      (hash-ref room-states room-name)
+      (room-items (room-find room-name))))
+
+; snapshot current floor-items into the room-states hash
+(define (room-save-items! room-name)
+  (hash-set! room-states room-name floor-items))
 
 ; enter a new room
 ; Claude assisted code
 (define (enter-room! dest-name)
-  
   (let* ((dest (room-find dest-name))
          ; find the connection in dest that leads back to where we came from
          (return-conn (findf (lambda (c) (string-ci=? (connection-name c) (room-name current-room)))
                              (room-connections dest))))
+    ; save current room's item state before leaving
+    (when current-room
+      (room-save-items! (room-name current-room)))
     (set! current-room dest)
-    (set! player-pos   (make-pos (connection-x return-conn)
-                                 (connection-y return-conn)
-                                 (pos-floor player-pos)))
-    (set! floor-items  (room-items dest))
+    ; nudge player one step inside so they are not sitting on the door edge
+    (set! player-pos
+          (nudge-inward dest
+                        (make-pos (connection-x return-conn)
+                                  (connection-y return-conn)
+                                  (pos-floor player-pos))))
+    ; restore this room's persisted item state
+    (set! floor-items (room-current-items dest-name))
     (displayln (format "You enter ~a." (room-name dest)))))
 
 
@@ -438,8 +480,10 @@
           (next-opts (cadr node)))
       
       ; loops through all npc lines and prints them before options appear
-      (for ((line npc-lines))
-        (displayln (format "~a: ~a" (npc-name npc) line)))
+      ; npc-lines can be a lambda to react to game state, or a plain list
+      (let ((actual-lines (if (procedure? npc-lines) (npc-lines) npc-lines)))
+        (for ((line actual-lines))
+          (displayln (format "~a: ~a" (npc-name npc) line))))
       ; checks if there are any options left, if '() is read then the conversation is over
       (cond
         ((or (null? next-opts)
@@ -477,12 +521,12 @@
 ; handle-talk
 ; looks to see if the npc exists then it calls talk to
 (define (handle-talk args)
-  
   (let ((found (npc-find args)))
-    
     (cond
       ((not found)
        (displayln (format "You don't see '~a' here." args)))
+      ((not (member (npc-name found) (room-characters current-room) string-ci=?))
+       (displayln (format "~a isn't here." (npc-name found))))
       (else
        (talk-to found)))))
 
@@ -501,29 +545,54 @@
     (else (displayln (format "Unknown direction: '~a'" args)))))
 
 ; outputs te direction and distance of a door from the player
+; outputs the direction and distance of a door from the player
 (define (door-hint conn)
   (let* ((dx (- (connection-x conn) (pos-x player-pos)))
          (dy (- (connection-y conn) (pos-y player-pos)))
          ; Claude helped with the math here
          (dist (+ (abs dx) (abs dy)))
          ; pick which cardinal direction is closest
-         (dir (cond ((and (> (abs dy) (abs dx)) (> dy 0)) "north")
-                    ((and (> (abs dy) (abs dx)) (< dy 0)) "south")
-                    ((> dx 0) "east")
-                    (else     "west"))))
+         (dir (cond
+                ; player is standing on the door, check which edge to find exit direction
+                ((= dist 0)
+                 (cond
+                   ((= (connection-x conn) (room-x2 current-room)) "enter east")
+                   ((= (connection-x conn) (room-x1 current-room)) "enter west")
+                   ((= (connection-y conn) (room-y2 current-room)) "enter north")
+                   (else                                            "enter south")))
+                ((and (> (abs dy) (abs dx)) (> dy 0)) "north")
+                ((and (> (abs dy) (abs dx)) (< dy 0)) "south")
+                ((> dx 0) "east")
+                (else     "west"))))
     (format "A door to ~a (~a) is ~a step~a away."
             (connection-name conn) dir dist (if (= dist 1) "" "s"))))
 
+; check if player is currently standing in a doorway
+(define (player-in-doorway?)
+  (room-door-at? current-room (pos-x player-pos) (pos-y player-pos)))
+
+; look around, shows items on the floor and nearby doors
 ; look around, shows items on the floor and nearby doors
 (define (look)
+  ; doorway check
+  (when (player-in-doorway?)
+    (displayln "You are standing in a doorway."))
   ; items
   (cond
     ((null? floor-items)
-     (displayln "You don't see anything of interest on the ground."))
+     (displayln "You don't see anything of interest in the room."))
     (else
-     (displayln "On the ground: ")
+     (displayln "In the room ")
      (for ((item floor-items))
        (displayln (format "  ~a" (item-name item))))))
+  ; people
+  (cond
+    ((null? (room-characters current-room))
+     (displayln "There is nobody else here."))
+    (else
+     (displayln "People: ")
+     (for ((person (room-characters current-room)))
+       (displayln (format "  ~a" person)))))
   ; doors
   (displayln "Doors: ")
   (for ([conn (room-connections current-room)])
@@ -562,7 +631,11 @@
        (let ((command (car parts))
              (args    (string-join (cdr parts) " ")))
          (cond
-           ((equal? command "move")      (handle-move args))
+           ((equal? command "move")
+            (let ((parts (string-split args)))
+              (if (= (length parts) 2)
+                  (move-n (car parts) (string->number (cadr parts)))
+                  (handle-move args))))
            ((equal? command "look")      (look))
            ((equal? command "take")      (handle-take args))
            ((equal? command "drop")      (drop args))
@@ -594,6 +667,33 @@
 (define (set-current-room! room) (set! current-room room))
 (define (set-floor-items! items) (set! floor-items items))
 (define (set-player-pos! pos) (set! player-pos pos))
+
+
+; ============================================================
+;                         MAIN
+; ============================================================
+; Should be the last thing the player uses because game loop is called inside of make-main
+(define (make-main start-room title description)
+  (set-current-room! start-room)
+  (set-floor-items!  (room-items start-room))
+  (displayln "===========================================")
+  (displayln title)
+  (displayln "===========================================")
+  (for ((line description))
+    (displayln line))
+  (displayln "")
+  (displayln "Commands: move [forward/backward/left/right]")
+  (displayln "          look")
+  (displayln "          talk [name]")
+  (displayln "          take [item]")
+  (displayln "          drop [item]")
+  (displayln "          inspect [item]")
+  (displayln "          inventory")
+  (displayln "          wander")
+  (displayln "          quit")
+  (displayln "===========================================")
+  (displayln "")
+  (game-loop))
 
 
 ; ============================================================
@@ -658,4 +758,7 @@
  ; Setters
  set-current-room!
  set-floor-items!
- set-player-pos!)
+ set-player-pos!
+
+ ; Main
+ make-main)
