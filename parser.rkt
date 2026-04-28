@@ -8,7 +8,7 @@ program    : section*
 ;               ROOM
 room       : ROOM /LBRACE room-prop* /RBRACE
 
-@room-prop : name | links | size | characters | items | dialogue | quest
+@room-prop : name | links | size | characters | items | quest
 
 name       : /NAME STRING
 links      : /LINKS str-list
