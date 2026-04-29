@@ -33,6 +33,7 @@
                #:when (and (syntax->list stx)
                            (eq? which (syntax->datum
                                        (car (syntax->list stx))))))
+<<<<<<< Updated upstream
       stx)))
 
 
@@ -51,6 +52,45 @@
 (define-macro (character KEYWORD FEATURE ...)
     #'(displayln "--- character macro ran (ignored for now) ---"))
 
+=======
+      stx))
+
+   ; NEW: safely unwrap a single-value property or return a default
+  (define (find-scalar which stx-list default)
+    (define result (find-property which stx-list))
+    (if result
+        (car result)       ; unwrap the list, get the single syntax value
+        default))          ; return default stx if property missing
+
+  ; NEW: convert a syntax string to a number literal at expansion time
+  (define (stx-string->number stx)
+    (datum->syntax stx
+      (string->number (syntax->datum stx)))))
+
+
+; macros (following professor's define-macro style)
+; expands a room node into a define that calls make-room
+; (room "create_room" (name "cave") (links "a" "b") ...)
+; →
+; (define cave (make-room "cave" '("a" "b") '() '() 0 0 10 10))
+(define-macro (room KEYWORD FEATURE ...)
+  (with-pattern
+      ; each of these binds a LIST of syntax children
+      ([NAME-PARTS   (or (find-property 'name       #'(FEATURE ...)) #'())]
+       [LINKS-PARTS  (or (find-property 'links      #'(FEATURE ...)) #'())]
+       [SIZE-PARTS   (or (find-property 'size       #'(FEATURE ...)) #'())]
+       [CHARS-PARTS  (or (find-property 'characters #'(FEATURE ...)) #'())]
+       [ITEMS-PARTS  (or (find-property 'items      #'(FEATURE ...)) #'())])
+    #'(room-register!
+        (make-room
+          (car 'NAME-PARTS)             ; single string → "The Bar"
+          (map (lambda (s)
+                 (make-connection s 0 0))
+               'LINKS-PARTS)            ; list of strings → connections
+          'CHARS-PARTS                  ; list (empty for now)
+          'ITEMS-PARTS                  ; list (empty for now)
+          0 0 10 10))))                 ; size — see note below
+>>>>>>> Stashed changes
 
 ; top-level: expands the whole program
 ; (program room-defn ... char-defn ...)
@@ -60,6 +100,7 @@
   (with-pattern
     ([(ROOM-DEFN ...)  (find-definitions 'room      #'(DEFN ...))]
      [(CHAR-DEFN ...)  (find-definitions 'character #'(DEFN ...))])
+<<<<<<< Updated upstream
     #'(#%module-begin
       (displayln "=== expander running ===")
       ; (displayln (format "rooms found: ~a" '(ROOM-DEFN ...)))
@@ -73,6 +114,11 @@
   ;   (displayln "=== expander running ===")
    ;  (displayln (format "all defns: ~a" '(DEFN ...)))
     ; (displayln "=== done ===")))
+=======
+    #'(#%module-begin     
+      ROOM-DEFN ...
+      (game-loop)) ))
+>>>>>>> Stashed changes
 
 (define (read-syntax path port)
   (read-line port)
