@@ -727,7 +727,6 @@
  current-room
  floor-items
  enter-room!
- room-find
 
  ; Player position
  player-pos
@@ -762,4 +761,6 @@
  set-player-pos!
 
  ; Main
- make-main)
+ make-main
+
+ room-find)
