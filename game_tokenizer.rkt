@@ -3,39 +3,59 @@
 
 (define adventure-lexer
   (lexer
+   ; ── whitespace & line comments ──────────────────────────────────
+   [whitespace                           (token lexeme #:skip? #t)]
+   [(:: ";" (:* (:~ #\newline)) #\newline) (token lexeme #:skip? #t)]
 
-   ;               WHITESPACE / PUNCTUATION
-   [whitespace  (token lexeme #:skip? #t)]
-   [":"         (token lexeme #:skip? #t)]
-   ["{"         (token 'LBRACE    lexeme)]
-   ["}"         (token 'RBRACE    lexeme)]
-   ["["         (token 'LBRACKET  lexeme)]
-   ["]"         (token 'RBRACKET  lexeme)]
-   [","         (token 'COMMA     lexeme)]
+   ; ── punctuation ─────────────────────────────────────────────────
+   ["{"  (token 'LBRACE   lexeme)]
+   ["}"  (token 'RBRACE   lexeme)]
+   ["["  (token 'LBRACKET lexeme)]
+   ["]"  (token 'RBRACKET lexeme)]
+   [","  (token 'COMMA    lexeme)]
+   [":"  (token 'COLON    lexeme)]
 
-   ;               STRINGS
+   ; ── quoted strings ───────────────────────────────────────────────
    [(:: #\" (:* (:~ #\")) #\")
-                (token 'STRING
-                       (substring lexeme 1 (- (string-length lexeme) 1)))]
+    (token 'STRING (substring lexeme 1 (- (string-length lexeme) 1)))]
 
-   ;               SECTION KEYWORDS
+   ; ── numbers ──────────────────────────────────────────────────────
+   [(:+ numeric) (token 'NUMBER (string->number lexeme))]
+
+   ; ── top-level section keywords ───────────────────────────────────
    ["create_room"      (token 'ROOM      lexeme)]
    ["create_character" (token 'CHARACTER lexeme)]
+   ["create_item"      (token 'ITEM-DEF  lexeme)]
 
-   ;               SHARED PROPERTIES
-   ["name"      (token 'NAME       lexeme)]
-   ["dialogue"  (token 'DIALOGUE   lexeme)]
-   ["items"     (token 'ITEMS      lexeme)]
-   ["quest"     (token 'QUEST      lexeme)]
+   ; ── shared property keywords ─────────────────────────────────────
+   ["name"    (token 'NAME    lexeme)]
+   ["items"   (token 'ITEMS   lexeme)]
 
-   ;               ROOM PROPERTIES
+   ; ── room-only property keywords ──────────────────────────────────
    ["size"       (token 'SIZE       lexeme)]
    ["characters" (token 'CHARACTERS lexeme)]
    ["links"      (token 'LINKS      lexeme)]
 
-   ;               CHARACTER PROPERTIES
-   ["room"      (token 'ROOM-PROP  lexeme)]))
+   ; ── character-only property keywords ────────────────────────────
+   ["room"      (token 'ROOM-PROP lexeme)]
+   ["dialogue"  (token 'DIALOGUE  lexeme)]
+   ["quest"     (token 'QUEST     lexeme)]
 
+   ; ── dialogue structural keywords ─────────────────────────────────
+   ["node"   (token 'NODE   lexeme)]
+   ["option" (token 'OPTION lexeme)]
+   ["npc"    (token 'NPC    lexeme)]
+   ["next"   (token 'NEXT   lexeme)]
+
+   ; ── quest structural keywords ────────────────────────────────────
+   ["targets" (token 'TARGETS lexeme)]
+   ["rewards" (token 'REWARDS lexeme)]
+   ["giver"   (token 'GIVER   lexeme)]
+
+   ; ── item structural keywords ─────────────────────────────────────
+   ["desc"    (token 'DESC    lexeme)]
+   ["value"   (token 'VALUE   lexeme)]
+   ["actions" (token 'ACTIONS lexeme)]))
 
 (define (make-tokenizer ip [path #f])
   (port-count-lines! ip)
