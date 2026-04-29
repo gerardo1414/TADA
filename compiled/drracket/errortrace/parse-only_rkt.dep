@@ -1,1 +1,0 @@
-("9.0" tarm64osx ("9ebdd07e154446f117216fcbd2387993e290aa94" . "df45bd2288e005b5503974f488b2d5a0966fd970") (collects #"TADA" #"game_tokenizer.rkt") (collects #"TADA" #"parser.rkt") (collects #"br" #"quicklang.rkt") (collects #"brag" #"support.rkt") (collects #"drracket" #"private" #"drracket-errortrace-key.rkt") (collects #"racket" #"runtime-config.rkt"))

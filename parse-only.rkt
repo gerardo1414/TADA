@@ -17,7 +17,8 @@
 
   ; print each section on its own line
   (for ([section (cdr datum)])
-    (writeln section))
+    (writeln section)
+    (newline))
 
   ; wrap in a valid module so Racket accepts it
   (datum->syntax #f
