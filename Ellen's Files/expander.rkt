@@ -12,7 +12,7 @@
   (define (find-property which stx-list)
     (for/first ([stx (in-list (syntax->list stx-list))]
                 #:when (and (syntax->list stx)
-                            (eq? which (syntax->datum4
+                            (eq? which (syntax->datum
                                         (car (syntax->list stx))))))
       (cdr (syntax->list stx))))  ; return all children, not just first
 
@@ -36,24 +36,55 @@
 ; (room "create_room" (name "cave") (links "a" "b") ...)
 ; →
 ; (define cave (make-room "cave" '("a" "b") '() '() 0 0 10 10))
-(define-macro (room KEYWORD FEATURE ...)
+(define-macro (room-def FEATURE ...)
   (with-pattern
-      ; each of these binds a LIST of syntax children
-      ([NAME-PARTS   (or (find-property 'name       #'(FEATURE ...)) #'())]
-       [LINKS-PARTS  (or (find-property 'links      #'(FEATURE ...)) #'())]
-       [SIZE-PARTS   (or (find-property 'size       #'(FEATURE ...)) #'())]
-       [CHARS-PARTS  (or (find-property 'characters #'(FEATURE ...)) #'())]
-       [ITEMS-PARTS  (or (find-property 'items      #'(FEATURE ...)) #'())])
-    #'(displayln 'NAME-PARTS)
-    (room-register!
-     (make-room
-      (car 'NAME-PARTS)             ; single string → "The Bar"
-      (map (lambda (s)
-             (make-connection s 0 0))
-           'LINKS-PARTS)            ; list of strings → connections
-      'CHARS-PARTS                  ; list (empty for now)
-      'ITEMS-PARTS                  ; list (empty for now)
-      0 0 10 10))))                 ; size — see note below
+      ([NAME-PARTS  (or (find-property 'rname      #'(FEATURE ...)) #'())]
+       [SIZE-PARTS  (or (find-property 'size       #'(FEATURE ...)) #'())]
+       [CHARS-PARTS (or (find-property 'characters #'(FEATURE ...)) #'())]
+       [ITEMS-PARTS (or (find-property 'room-items #'(FEATURE ...)) #'())]
+       [LINK-PARTS  (or (find-property 'links      #'(FEATURE ...)) #'())])
+ 
+    ; pull the single name string (first child of rname node)
+    (define name-stx
+      (let ([parts (syntax->list #'NAME-PARTS)])
+        (if (null? parts) #'"unnamed" (car parts))))
+ 
+    ; pull size coords; default to 0 0 10 10 if size absent
+    (define size-list (syntax->list #'SIZE-PARTS))
+    (define x1-stx (if (>= (length size-list) 4) (list-ref size-list 0) #'0))
+    (define y1-stx (if (>= (length size-list) 4) (list-ref size-list 1) #'0))
+    (define x2-stx (if (>= (length size-list) 4) (list-ref size-list 2) #'10))
+    (define y2-stx (if (>= (length size-list) 4) (list-ref size-list 3) #'10))
+     ; build one (make-connection ...) form per link child
+    (define conn-exprs
+      (map (lambda (ln)
+             (define parts (syntax->list ln))
+             (define dest (cadr  parts))
+             (define dx   (caddr parts))
+             (define dy   (cadddr parts))
+             #`(make-connection #,dest #,dx #,dy))
+           (syntax->list #'LINK-PARTS)))
+ 
+    ; chars and items are flat string lists
+    (define char-stxs (syntax->list #'CHARS-PARTS))
+    (define item-stxs (syntax->list #'ITEMS-PARTS))
+ 
+    ; assemble final syntax — everything runs at RUNTIME (phase 0)
+    (with-syntax ([ROOM-NAME          name-stx]
+                  [X1                 x1-stx]
+                  [Y1                 y1-stx]
+                  [X2                 x2-stx]
+                  [Y2                 y2-stx]
+                  [(CONN-EXPR ...) (datum->syntax #'(FEATURE ...) conn-exprs)]
+                  [(CHAR-STR ...)  (datum->syntax #'(FEATURE ...) char-stxs)]
+                  [(ITEM-STR ...)  (datum->syntax #'(FEATURE ...) item-stxs)])
+      #'(room-register!
+         (make-room
+          ROOM-NAME
+          (list CONN-EXPR ...)
+          (list CHAR-STR ...)
+          (list ITEM-STR ...)
+          X1 Y1 X2 Y2)))))
 
 ; top-level: expands the whole program
 ; (program room-defn ... char-defn ...)
@@ -74,4 +105,4 @@
 
 (provide read-syntax)
 (provide (rename-out [program #%module-begin]))
-(provide room character make-room)
+(provide room-def character make-room)
