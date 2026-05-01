@@ -14,9 +14,26 @@ link       : STRING /COLON NUMBER NUMBER
 ; ── character ────────────────────────────────────────────────────────
 character-def : /CHARACTER /LBRACE char-prop*  /RBRACE
 @char-prop    : rname | char-room | char-items | dialogue-block | quest-block
+<<<<<<< HEAD:parser.rkt
+
+name       : /NAME STRING
+size       : /SIZE str-list
+items      : /ITEMS str-list
+dialogue   : /DIALOGUE str-list
+quest      : /QUEST str-list
+
+
+;               CHARACTER
+character  : CHARACTER /LBRACE char-prop* /RBRACE
+char-room  : /ROOM-PROP STRING
+char-items : /ITEMS /LBRACKET str-list /RBRACKET
+
+; ── dialogue tree ──────────────────────────────────────────────────────
+=======
 char-room     : /ROOM-PROP STRING
 char-items    : /ITEMS /LBRACKET str-list /RBRACKET
 ; ── dialogue tree ────────────────────────────────────────────────────
+>>>>>>> 6f6d54c4b86f52b4c0a86b1b612e502b784c6c9f:Ellen's Files/parser.rkt
 dialogue-block : /DIALOGUE /LBRACE  dial-node*  /RBRACE
 dial-node      : /NODE STRING /LBRACE npc-lines option* /RBRACE
 npc-lines      : /NPC    /LBRACKET str-list /RBRACKET
