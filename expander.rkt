@@ -12,7 +12,7 @@
   (define (find-property which stx-list)
     (for/first ([stx (in-list (syntax->list stx-list))]
                 #:when (and (syntax->list stx)
-                            (eq? which (syntax->datum
+                            (eq? which (syntax->datum4
                                         (car (syntax->list stx))))))
       (cdr (syntax->list stx))))  ; return all children, not just first
 
