@@ -1,8 +1,7 @@
-#lang reader "expander.rkt"
-
+#lang TADA
 create_room {
     name:       "cave"
-    links:      ["windy hall", "forest entrance"]
+    links:      ["windy hall" 6 7, "forest entrance" 7 6]
     size:       ["6 6 8 8"]
     characters: ["old hermit", "bat swarm"]
     items:      ["torch", "rope"]

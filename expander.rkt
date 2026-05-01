@@ -1,16 +1,6 @@
 #lang br/quicklang
-(require "game_tokenizer.rkt")
-(require "parser.rkt")
 (require brag/support)
-
-; runtime (swap for require when Gerardo fixes his file)
-(define (make-room name connections characters items x1 y1 x2 y2)
-  (displayln (format "Room created: ~a" name))
-  (displayln (format "  Links: ~a" connections))
-  (list name connections characters items x1 y1 x2 y2))
-
-(define (room-name r)        (list-ref r 0))
-(define (room-connections r) (list-ref r 1))
+(require "TADA_Racket.rkt")
 
 ; SYNTAX HELPERS (phase 1, mirrors professor's pattern)
 (begin-for-syntax
@@ -33,39 +23,12 @@
                #:when (and (syntax->list stx)
                            (eq? which (syntax->datum
                                        (car (syntax->list stx))))))
-<<<<<<< Updated upstream
       stx)))
 
 
-; macros (following professor's define-macro style)
-; expands a room node into a define that calls make-room
-; (room "create_room" (name "cave") (links "a" "b") ...)
-; →
-; (define cave (make-room "cave" '("a" "b") '() '() 0 0 10 10))
-(define-macro (room NAME FEATURE ...)
-  #'(begin
-      (displayln "--- room macro ran ---")
-      (displayln (format "  features: ~a" '(FEATURE ...)))
-      (room-register! (make-room ...))))
-
 ; expands a character node — ignored for now
 (define-macro (character KEYWORD FEATURE ...)
-    #'(displayln "--- character macro ran (ignored for now) ---"))
-
-=======
-      stx))
-
-   ; NEW: safely unwrap a single-value property or return a default
-  (define (find-scalar which stx-list default)
-    (define result (find-property which stx-list))
-    (if result
-        (car result)       ; unwrap the list, get the single syntax value
-        default))          ; return default stx if property missing
-
-  ; NEW: convert a syntax string to a number literal at expansion time
-  (define (stx-string->number stx)
-    (datum->syntax stx
-      (string->number (syntax->datum stx)))))
+  #'(displayln "--- character macro ran (ignored for now) ---"))
 
 
 ; macros (following professor's define-macro style)
@@ -81,16 +44,16 @@
        [SIZE-PARTS   (or (find-property 'size       #'(FEATURE ...)) #'())]
        [CHARS-PARTS  (or (find-property 'characters #'(FEATURE ...)) #'())]
        [ITEMS-PARTS  (or (find-property 'items      #'(FEATURE ...)) #'())])
-    #'(room-register!
-        (make-room
-          (car 'NAME-PARTS)             ; single string → "The Bar"
-          (map (lambda (s)
-                 (make-connection s 0 0))
-               'LINKS-PARTS)            ; list of strings → connections
-          'CHARS-PARTS                  ; list (empty for now)
-          'ITEMS-PARTS                  ; list (empty for now)
-          0 0 10 10))))                 ; size — see note below
->>>>>>> Stashed changes
+    #'(displayln 'NAME-PARTS)
+    (room-register!
+     (make-room
+      (car 'NAME-PARTS)             ; single string → "The Bar"
+      (map (lambda (s)
+             (make-connection s 0 0))
+           'LINKS-PARTS)            ; list of strings → connections
+      'CHARS-PARTS                  ; list (empty for now)
+      'ITEMS-PARTS                  ; list (empty for now)
+      0 0 10 10))))                 ; size — see note below
 
 ; top-level: expands the whole program
 ; (program room-defn ... char-defn ...)
@@ -98,39 +61,16 @@
 ; (#%module-begin (define cave ...) (define windy-hall ...) ...)
 (define-macro (program DEFN ...)
   (with-pattern
-    ([(ROOM-DEFN ...)  (find-definitions 'room      #'(DEFN ...))]
-     [(CHAR-DEFN ...)  (find-definitions 'character #'(DEFN ...))])
-<<<<<<< Updated upstream
+      ([(ROOM-DEFN ...)  (find-definitions 'room      #'(DEFN ...))]
+       [(CHAR-DEFN ...)  (find-definitions 'character #'(DEFN ...))])
     #'(#%module-begin
-      (displayln "=== expander running ===")
-      ; (displayln (format "rooms found: ~a" '(ROOM-DEFN ...)))
-      ROOM-DEFN ...
-      ; CHAR-DEFN ...
-      (game-loop)
+       (displayln "=== expander running ===")
+       ; (displayln (format "rooms found: ~a" '(ROOM-DEFN ...)))
+       ROOM-DEFN ...
+       ; CHAR-DEFN ...
+       (game-loop)
        (displayln "=== done ==="))))
 
-;(define-macro (program DEFN ...)
- ; #'(#%module-begin
-  ;   (displayln "=== expander running ===")
-   ;  (displayln (format "all defns: ~a" '(DEFN ...)))
-    ; (displayln "=== done ===")))
-=======
-    #'(#%module-begin     
-      ROOM-DEFN ...
-      (game-loop)) ))
->>>>>>> Stashed changes
-
-(define (read-syntax path port)
-  (read-line port)
-  (define parse-tree (parse path (make-tokenizer port path)))
-  ; parse-tree is (program (room ...) (room ...))
-  ; we need to splice its children directly into the module
-  (define tree-datum (syntax->datum parse-tree))
-  (define children (cdr tree-datum))  ; strip the 'program wrapper
-  (strip-bindings
-   #`(module game-mod "expander.rkt"
-       #,@(map (lambda (c) (datum->syntax parse-tree c))
-               children))))
 
 (provide read-syntax)
 (provide (rename-out [program #%module-begin]))

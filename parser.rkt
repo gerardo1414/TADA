@@ -19,12 +19,9 @@ link       : STRING /COLON NUMBER NUMBER
 ; ── character ─────────────────────────────────────────────────────────
 character-def : /CHARACTER /LBRACE char-prop*  /RBRACE
 @char-prop    : rname | char-room | char-items | dialogue-block | quest-block
-@room-prop : name | links | size | characters | items | quest
 
 name       : /NAME STRING
-links      : /LINKS str-list
 size       : /SIZE str-list
-characters : /CHARACTERS str-list
 items      : /ITEMS str-list
 dialogue   : /DIALOGUE str-list
 quest      : /QUEST str-list
