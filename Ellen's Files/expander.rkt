@@ -2,7 +2,7 @@
 (require brag/support)
 (require "TADA_Racket.rkt")
 
-; SYNTAX HELPERS (phase 1, mirrors professor's pattern)
+; SYNTAX HELPERS 
 (begin-for-syntax
   (require racket/list)
 
@@ -30,11 +30,9 @@
 (define-macro (character KEYWORD FEATURE ...)
   #'(displayln "--- character macro ran (ignored for now) ---"))
 
-
 ; macros (following professor's define-macro style)
 ; expands a room node into a define that calls make-room
 ; (room "create_room" (name "cave") (links "a" "b") ...)
-; →
 ; (define cave (make-room "cave" '("a" "b") '() '() 0 0 10 10))
 (define-macro (room-def FEATURE ...)
   (with-pattern
@@ -56,10 +54,11 @@
     (define x2-stx (if (>= (length size-list) 4) (list-ref size-list 2) #'10))
     (define y2-stx (if (>= (length size-list) 4) (list-ref size-list 3) #'10))
      ; build one (make-connection ...) form per link child
+    ; example: ((link "Armory" 10 5) (link "Garden" 5 0)) is LINK-PARTS, get 
     (define conn-exprs
       (map (lambda (ln)
              (define parts (syntax->list ln))
-             (define dest (cadr  parts))
+             (define dest (cadr  parts)) 
              (define dx   (caddr parts))
              (define dy   (cadddr parts))
              #`(make-connection #,dest #,dx #,dy))
@@ -86,23 +85,37 @@
           (list ITEM-STR ...)
           X1 Y1 X2 Y2)))))
 
+;start-def
+(define-macro (start-def FEATURE ...)
+  (with-pattern
+      ([(ROOM)  (find-property 'start-room      #'(FEATURE ...))]
+       [(TITLE)  (find-property 'start-title      #'(FEATURE ...))]
+       [INTRO  (find-property 'start-intro      #'(FEATURE ...))])
+
+        #'(make-main ROOM
+                     TITLE
+                    'INTRO)))
+
+
+   
+
 ; top-level: expands the whole program
 ; (program room-defn ... char-defn ...)
-; →
 ; (#%module-begin (define cave ...) (define windy-hall ...) ...)
-(define-macro (program DEFN ...)
-  (with-pattern
-      ([(ROOM-DEFN ...)  (find-definitions 'room      #'(DEFN ...))]
-       [(CHAR-DEFN ...)  (find-definitions 'character #'(DEFN ...))])
+(define-macro (tada-macro-begin (program DEFN ...))
+  ;(with-pattern
+      ;([(ROOM-DEFN ...)  (find-definitions 'room-def      #'(DEFN ...))]
+       ;[(CHAR-DEFN ...)  (find-definitions 'character #'(DEFN ...))])
     #'(#%module-begin
        (displayln "=== expander running ===")
-       ; (displayln (format "rooms found: ~a" '(ROOM-DEFN ...)))
-       ROOM-DEFN ...
+       (displayln (format "defns found: ~a" '(DEFN ...)))
+       DEFN ...
        ; CHAR-DEFN ...
-       (game-loop)
-       (displayln "=== done ==="))))
+       
+       (displayln "=== done ===")))
 
 
 (provide read-syntax)
-(provide (rename-out [program #%module-begin]))
+(provide (rename-out [tada-macro-begin #%module-begin]))
 (provide room-def character make-room)
+(provide start-def )
