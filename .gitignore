@@ -4,3 +4,4 @@ compiled/
 ~$*
 project_solutions/
 *.2
+.DS_Store
