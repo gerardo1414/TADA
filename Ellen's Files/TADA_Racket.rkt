@@ -664,7 +664,9 @@
 ;                         SETTERS
 ; ============================================================
 
-(define (set-current-room! room) (set! current-room room))
+(define (set-current-room! room) (if (string? room)
+                                     (set! current-room (room-find room))
+                                     (set! current-room room)))
 (define (set-floor-items! items) (set! floor-items items))
 (define (set-player-pos! pos) (set! player-pos pos))
 
@@ -675,7 +677,7 @@
 ; Should be the last thing the player uses because game loop is called inside of make-main
 (define (make-main start-room title description)
   (set-current-room! start-room)
-  (set-floor-items!  (room-items start-room))
+  (set-floor-items!  (room-items current-room))
   (displayln "===========================================")
   (displayln title)
   (displayln "===========================================")

@@ -87,6 +87,7 @@
 
 ;start-def
 (define-macro (start-def FEATURE ...)
+  (displayln "making main!")
   (with-pattern
       ([(ROOM)  (find-property 'start-room      #'(FEATURE ...))]
        [(TITLE)  (find-property 'start-title      #'(FEATURE ...))]
@@ -107,12 +108,12 @@
       ;([(ROOM-DEFN ...)  (find-definitions 'room-def      #'(DEFN ...))]
        ;[(CHAR-DEFN ...)  (find-definitions 'character #'(DEFN ...))])
     #'(#%module-begin
-       (displayln "=== expander running ===")
-       (displayln (format "defns found: ~a" '(DEFN ...)))
-       DEFN ...
+;       (displayln "=== expander running ===")
+;       (displayln (format "defns found: ~a" '(DEFN ...)))
+       DEFN ...))
        ; CHAR-DEFN ...
        
-       (displayln "=== done ===")))
+;       (displayln "=== done ===")))
 
 
 (provide read-syntax)
