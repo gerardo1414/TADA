@@ -98,7 +98,77 @@
                     'INTRO)))
 
 
-   
+; ITEM MACRO
+(define-macro (item-def FEATURE ...)
+  (with-pattern
+      ([(ITEM_NAME)   (find-property 'item-name    #'(FEATURE ...))]
+       [(ITEM_DESC)   (find-property 'item-desc    #'(FEATURE ...))]
+       [(ITEM_VALUE)  (find-property 'item-value   #'(FEATURE ...))]
+       [(ACTIONS ...)  (find-property 'item-actions #'(FEATURE ...))])
+    #'(begin
+        (item-register!
+         (make-item ITEM_NAME ITEM_DESC ITEM_VALUE (list (string->symbol ACTIONS) ...)))
+        (displayln (format "registered item: ~a" ITEM_NAME)))))
+
+
+;QUEST MACRO
+(define-macro (quest-block FEATURE ...)
+  (with-pattern
+      ([(QUEST_DESC)  (find-property 'quest-name    #'(FEATURE ...))]
+       [(TARGET ...)  (find-property 'quest-targets #'(FEATURE ...))]
+       [(REWARD ...)  (find-property 'quest-rewards #'(FEATURE ...))]
+       [(QUEST_GIVER) (find-property 'quest-giver   #'(FEATURE ...))])
+    #'(begin
+        (quest-register!
+         (make-quest QUEST_DESC (list TARGET ...) (list REWARD ...) QUEST_GIVER))
+        (quest-assign! QUEST_DESC))))
+
+
+;CHARACTER MACRO (MOST COMPLEX SO CREATE SIMPLE MACRO)
+(define-macro (character-def FEATURE ...)
+  (with-pattern
+      ([(CNAME)          (find-property    'rname          #'(FEATURE ...))]
+       [(ITEM-STR ...)   (find-property    'char-items     #'(FEATURE ...))]
+       [(DIAL-DEF ...)   (find-definitions 'dialogue-block #'(FEATURE ...))]
+       [(QUEST-DEF ...)  (find-definitions 'quest-block    #'(FEATURE ...))])
+    #'(begin
+        (npc-register!
+         (make-npc CNAME
+                   (if (null? '(DIAL-DEF ...))
+                       '(() ())
+                       (car (list DIAL-DEF ...)))
+                   '()
+                   (filter-map item-find (list ITEM-STR ...))))
+        QUEST-DEF ...)))
+
+; DIALOGUE MACROS, NESTED WITHIN CHARACTER MACRO 3 MACROS BUILDING ON EACH OTHER, BOTTOM UP
+
+;FIRST, CREATE OPTIONS IN DIALOGUE TREE - added find nexet node, to look up next node at runtime
+;Explanation for change: instead of trying to pass the next node at compile time,
+;we look it up at runtime by name from the registry, same pattern as room-find and item-find.
+; so if dialogue ends from node, go back before to like "bye" node to end
+(define-macro (option FEATURE ...)
+  (with-pattern
+      ([(OPLAYER)  (find-property 'opt-player #'(FEATURE ...))]
+       [(LINE ...) (find-property 'npc-lines  #'(FEATURE ...))]
+       [(NEXT)     (find-property 'next-node  #'(FEATURE ...))])
+    #'(make-option OPLAYER (list LINE ...) 
+                   (lambda () (find-dialogue-node NEXT)))))
+
+;dialogue-node (in parse tree named dial-node so named it that) - now changed dial-node to register itself to make dialogue link
+(define-macro (dial-node NODE-NAME FEATURE ...)
+  (with-pattern
+      ([(LINE ...)    (find-property    'npc-lines #'(FEATURE ...))]
+       [(OPT-DEF ...) (find-definitions 'option    #'(FEATURE ...))])
+    #'(let ((node (make-dialogue-node (list LINE ...) (list OPT-DEF ...))))
+        (register-dialogue-node! NODE-NAME node)
+        node)))
+
+;dialogue-block (seraches for 'dial-node from parse tree)
+(define-macro (dialogue-block FEATURE ...)
+  (with-pattern
+      ([(NODE-DEF ...) (find-definitions 'dial-node #'(FEATURE ...))])
+    #'(car (list NODE-DEF ...))))
 
 ; top-level: expands the whole program
 ; (program room-defn ... char-defn ...)
@@ -118,5 +188,4 @@
 
 (provide read-syntax)
 (provide (rename-out [tada-macro-begin #%module-begin]))
-(provide room-def character make-room)
-(provide start-def )
+(provide room-def character make-room start-def item-def quest-block character-def option dial-node dialogue-block  register-dialogue-node! find-dialogue-node)

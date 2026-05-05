@@ -17,6 +17,17 @@
 
 ; Maybe give items coordinatesq
 
+
+;expander helpers:
+; item registry
+(define item-registry '())
+
+(define (item-register! item)
+  (set! item-registry (append item-registry (list item))))
+
+(define (item-find name)
+  (findf (lambda (i) (string-ci=? (item-name i) name)) item-registry))
+
 ; check if an item can do the action
 (define (item-can? item action)
   ; member returns a sublist instead when something is found, it returns false if nothing is found
@@ -304,10 +315,11 @@
 (define room-states (make-hash))
 
 ; returns the current items for a room, falling back to original if unvisited
+;CHANGE BY SAUL: WRAP room-items to resolve strings to structs
 (define (room-current-items room-name)
   (if (hash-has-key? room-states room-name)
       (hash-ref room-states room-name)
-      (room-items (room-find room-name))))
+      (filter-map item-find (room-items (room-find room-name)))))
 
 ; snapshot current floor-items into the room-states hash
 (define (room-save-items! room-name)
@@ -402,10 +414,14 @@
   (for ((target (quest-targets quest)))
     (inventory-remove! target)
     (displayln (format "  You hand over: ~a." target)))
-  
-  (for ((reward (quest-rewards quest)))
-    (inventory-add! reward)
-    (displayln (format "  You receive: ~a." (item-name reward))))
+
+
+  ; CHANGED QUEST-REWARD INTO ITEM STRUCT, NOT STRING
+(for ((reward (quest-rewards quest)))
+  (let ((reward-item (item-find reward)))
+    (when reward-item
+      (inventory-add! reward-item)
+      (displayln (format "  You receive: ~a." (item-name reward-item))))))
   
   ; Claude assisted code
   (set! quests
@@ -444,6 +460,16 @@
 (define (npc-find name)
   
   (findf (lambda (n) (string-ci=? (npc-name n) name)) npcs))
+
+
+;ADDED A NODE REGISTY, look up a node by name at runtime : BY SAUL
+(define dialogue-nodes (make-hash))
+
+(define (register-dialogue-node! name node)
+  (hash-set! dialogue-nodes name node))
+
+(define (find-dialogue-node name)
+  (hash-ref dialogue-nodes name '(() ())))
 
 ; --- Dialogue Helpers ---
 ; helpers were my idea but claude assisted in fleshing them out
@@ -509,10 +535,14 @@
                     (for ((line actual-responses))
                       (displayln (format "~a: ~a" (npc-name npc) line)))
                     ; caddr is next batch of options, make into hash before loop
-                    (loop (list '()
-                                (for/hash ((opt (caddr chosen))
-                                           (i (in-naturals 1)))
-                                  (values i opt))))))))
+                    ; caddr is next batch of options, handle lambda (next-node) or plain list
+                    (let ((next (caddr chosen)))
+                      (loop (if (procedure? next)
+                                (next)
+                                (list '()
+                                      (for/hash ((opt next)
+                                                 (i (in-naturals 1)))
+                                        (values i opt))))))  ))))
              (else
               (displayln "That is not a valid choice.")
               ; re-prompt instead of ending conversation on bad input
@@ -677,7 +707,7 @@
 ; Should be the last thing the player uses because game loop is called inside of make-main
 (define (make-main start-room title description)
   (set-current-room! start-room)
-  (set-floor-items!  (room-items current-room))
+  (set-floor-items! (filter-map item-find (room-items current-room)))
   (displayln "===========================================")
   (displayln title)
   (displayln "===========================================")
@@ -707,6 +737,10 @@
  make-item
  item-name
  item-can?
+
+ item-register!
+ item-find
+ item-registry
 
  ; Inventory & gold
  inventory-add!
@@ -740,6 +774,12 @@
  make-dialogue-node
  make-option
  npc-register!
+
+ ;npcs dialogue from saul
+
+ dialogue-nodes
+ register-dialogue-node!
+ find-dialogue-node 
 
  ; Quests
  make-quest
